@@ -1,5 +1,5 @@
-# PPGI071 - Aprendizado de Máquina
-Repositório de conteúdos para a disciplina de Aprendizado de Máquina, oferecida no Instituto de Computação da Universidade Federal de Alagoas.
+# PPGI071 - Aprendizado por Reforço
+Repositório de conteúdos para a disciplina de Aprendizado por Reforço, oferecida no Instituto de Computação da Universidade Federal de Alagoas.
 
 🌐 **Página da disciplina:** https://glauberrleite.github.io/curso-aprendizado-de-maquina/
 
