@@ -1,0 +1,733 @@
+<meta charset="utf-8">
+<title>PPGI071 — Aprendizado de Máquina · Aprendizado por Reforço</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Disciplina PPGI071 — Aprendizado de Máquina (Aprendizado por Reforço), Instituto de Computação, UFAL. Prof. Glauber Rodrigues Leite.">
+<style>
+/* ============================================================
+   PPGI071 — Aprendizado de Máquina (Aprendizado por Reforço)
+   Página inicial da disciplina.
+   Registro visual: caderno de laboratório / instrumentação,
+   o mesmo das disciplinas de Robótica e de Probabilidade.
+
+   Acentos com significado fixo (valem em todas as aulas):
+     --agente     (violeta) = agente, ação, política
+     --ambiente   (teal)    = ambiente, estado, transição
+     --recompensa (âmbar)   = recompensa, retorno, valor
+     --alerta     (vermelho)= limitação, armadilha
+   ============================================================ */
+
+:root {
+  --paper:      #f2f4f6;
+  --surface:    #ffffff;
+  --surface-2:  #e9ecf0;
+  --ink:        #141a20;
+  --ink-soft:   #46525e;
+  --ink-mute:   #6d7a88;
+  --rule:       #d5dae1;
+  --rule-soft:  #e5e8ed;
+
+  --agente:     #5645b8;
+  --agente-bg:  #e7e4f7;
+  --ambiente:   #0d6e7d;
+  --ambiente-bg:#dfeef0;
+  --recompensa: #a8620a;
+  --recompensa-bg:#f6ecdd;
+  --alerta:     #9d332e;
+  --alerta-bg:  #f7e7e5;
+
+  --serif: ui-serif, "Iowan Old Style", Charter, "Bitstream Charter", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono:  ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --measure: 74ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:#0e1216; --surface:#161c22; --surface-2:#1e262e;
+    --ink:#e4e9ee; --ink-soft:#b4c0ca; --ink-mute:#8593a1;
+    --rule:#28323c; --rule-soft:#1d252d;
+    --agente:#a99cf0; --agente-bg:#211d3a;
+    --ambiente:#55c0d2; --ambiente-bg:#102a30;
+    --recompensa:#e2a355; --recompensa-bg:#2a2013;
+    --alerta:#e2867d; --alerta-bg:#2c1817;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#0e1216; --surface:#161c22; --surface-2:#1e262e;
+  --ink:#e4e9ee; --ink-soft:#b4c0ca; --ink-mute:#8593a1;
+  --rule:#28323c; --rule-soft:#1d252d;
+  --agente:#a99cf0; --agente-bg:#211d3a;
+  --ambiente:#55c0d2; --ambiente-bg:#102a30;
+  --recompensa:#e2a355; --recompensa-bg:#2a2013;
+  --alerta:#e2867d; --alerta-bg:#2c1817;
+}
+:root[data-theme="light"] {
+  --paper:#f2f4f6; --surface:#ffffff; --surface-2:#e9ecf0;
+  --ink:#141a20; --ink-soft:#46525e; --ink-mute:#6d7a88;
+  --rule:#d5dae1; --rule-soft:#e5e8ed;
+  --agente:#5645b8; --agente-bg:#e7e4f7;
+  --ambiente:#0d6e7d; --ambiente-bg:#dfeef0;
+  --recompensa:#a8620a; --recompensa-bg:#f6ecdd;
+  --alerta:#9d332e; --alerta-bg:#f7e7e5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: var(--measure); margin: 0 auto; padding: 0 1.75rem; }
+
+/* ---------- topo ---------- */
+
+.top {
+  position: sticky; top: 0; z-index: 5;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+.top .wrap { display: flex; align-items: center; gap: 1rem; padding-top: .6rem; padding-bottom: .6rem; }
+.top .brand {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-mute); flex: 1; min-width: 0;
+}
+.top .brand b { color: var(--ink); font-weight: 600; letter-spacing: .1em; }
+.btn-line {
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase;
+  background: transparent; color: var(--ink-mute); border: 1px solid var(--rule);
+  padding: .38rem .6rem; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.btn-line:hover { color: var(--ink); border-color: var(--ink-mute); }
+
+/* ---------- capa ---------- */
+
+.hero {
+  border-bottom: 1px solid var(--rule);
+  padding: 3.6rem 0 2.4rem;
+  background-image:
+    linear-gradient(to right, var(--rule-soft) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule-soft) 1px, transparent 1px);
+  background-size: 28px 28px; background-position: -1px -1px;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-mute);
+}
+h1 {
+  font-size: clamp(2.1rem, 5vw, 3.1rem); line-height: 1.08; font-weight: 600;
+  letter-spacing: -0.018em; margin: .7rem 0 0; text-wrap: balance; max-width: 18ch;
+}
+h1 em { font-style: italic; color: var(--agente); }
+.dek { margin: 1.05rem 0 0; font-size: 1.12rem; color: var(--ink-soft); max-width: 54ch; }
+
+.hero-fig { margin-top: 2rem; }
+.hero-fig canvas {
+  display: block; width: 100%; height: 210px;
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
+.hero-cap {
+  margin-top: .55rem; font-family: var(--sans); font-size: .78rem;
+  color: var(--ink-mute); display: flex; gap: 1.4rem; flex-wrap: wrap;
+}
+.hero-cap span::before {
+  content: ""; display: inline-block; width: 1.4rem; height: 0;
+  border-top: 2px solid currentColor; vertical-align: middle; margin-right: .4rem;
+}
+.hero-cap .k-age { color: var(--agente); }
+.hero-cap .k-amb { color: var(--ambiente); }
+.hero-cap .k-rec { color: var(--recompensa); }
+
+/* ---------- seções ---------- */
+
+section { padding: 3rem 0 0; }
+.sec-head { margin: 0 0 1.3rem; }
+.sec-head .n {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-mute);
+}
+h2 {
+  font-size: clamp(1.5rem, 2.6vw, 1.9rem); line-height: 1.15; font-weight: 600;
+  letter-spacing: -0.012em; margin: .3rem 0 0; text-wrap: balance;
+}
+.sec-head .sub {
+  display: block; margin-top: .35rem; font-family: var(--sans);
+  font-size: .88rem; color: var(--ink-mute); max-width: 56ch;
+}
+h3 { font-family: var(--sans); font-size: .95rem; font-weight: 650; margin: 1.8rem 0 .6rem; }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.05rem; padding-left: 1.25rem; }
+li { margin: 0 0 .4rem; }
+a { color: var(--agente); text-underline-offset: 2px; }
+strong { font-weight: 650; }
+.v { font-style: italic; }
+:focus-visible { outline: 2px solid var(--agente); outline-offset: 2px; }
+
+/* ---------- aulas ---------- */
+
+.aula {
+  display: grid; grid-template-columns: 3.2rem 1fr; gap: 1rem;
+  border: 1px solid var(--rule); border-left: 2px solid var(--agente);
+  background: var(--surface); padding: 1rem 1.15rem; margin-bottom: .8rem;
+}
+.aula.soon { border-left-color: var(--rule); opacity: .72; }
+.aula .num {
+  font-family: var(--mono); font-size: 1.5rem; color: var(--agente);
+  line-height: 1; padding-top: .15rem;
+}
+.aula.soon .num { color: var(--ink-mute); }
+.aula .t { font-family: var(--sans); font-weight: 650; font-size: 1rem; margin: 0 0 .25rem; }
+.aula .d { font-family: var(--sans); font-size: .85rem; color: var(--ink-soft); margin: 0 0 .6rem; }
+.aula .links { display: flex; gap: .5rem; flex-wrap: wrap; }
+.aula .links a, .aula .links span {
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .08em; text-transform: uppercase;
+  border: 1px solid var(--rule); padding: .3rem .55rem; text-decoration: none; color: var(--ink-soft);
+}
+.aula .links a:hover { border-color: var(--agente); color: var(--agente); }
+.aula .links span { color: var(--ink-mute); border-style: dashed; }
+
+/* ---------- ementa ---------- */
+
+.ementa { border-top: 1px solid var(--rule); margin: 0 0 1.2rem; }
+.ementa .it {
+  display: grid; grid-template-columns: 2.4rem 1fr auto; gap: .8rem; align-items: baseline;
+  padding: .5rem 0; border-bottom: 1px solid var(--rule-soft);
+  font-family: var(--sans); font-size: .9rem;
+}
+.ementa .it .n { font-family: var(--mono); font-size: .72rem; color: var(--ink-mute); }
+.ementa .it .tag {
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ambiente);
+}
+.ementa .it.done { color: var(--ink); }
+.ementa .it.done .n { color: var(--agente); }
+
+/* ---------- caixas ---------- */
+
+.note {
+  border: 1px solid var(--rule); border-left: 2px solid var(--ink-mute);
+  padding: .85rem 1.1rem; margin: 0 0 1.1rem; background: var(--surface);
+}
+.note .lab {
+  display: block; font-family: var(--mono); font-size: .66rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-mute); margin-bottom: .3rem;
+}
+.note p:last-child { margin-bottom: 0; }
+.note.rec { border-left-color: var(--recompensa); background: var(--recompensa-bg); }
+.note.rec .lab { color: var(--recompensa); }
+
+.eq {
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.3;
+  text-align: center; margin: 1.3rem 0; overflow-x: auto; padding: .3rem 0;
+}
+.frac {
+  display: inline-flex; flex-direction: column; vertical-align: middle;
+  text-align: center; margin: 0 .18em;
+}
+.frac > span:first-child { border-bottom: 1px solid currentColor; padding: 0 .4em .12em; }
+.frac > span:last-child { padding: .12em .4em 0; }
+
+/* ---------- glossário ---------- */
+
+.tbl-scroll { overflow-x: auto; }
+.tri { width: 100%; border-collapse: collapse; margin: 1.1rem 0; }
+.tri th, .tri td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tri th {
+  font-family: var(--sans); font-size: .7rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-mute); font-weight: 600; white-space: nowrap;
+}
+.tri td { font-family: var(--sans); font-size: .86rem; }
+.tri td.sym {
+  font-family: var(--serif); font-size: 1.05rem; white-space: nowrap; color: var(--ink);
+}
+.tri td.sym.age { color: var(--agente); }
+.tri td.sym.amb { color: var(--ambiente); }
+.tri td.sym.rec { color: var(--recompensa); }
+.tri td.quem { font-family: var(--mono); font-size: .74rem; color: var(--ink-mute); white-space: nowrap; }
+
+.termos { margin: 1.2rem 0 0; padding: 0; list-style: none; }
+.termos li {
+  border-top: 1px solid var(--rule-soft); padding: .55rem 0; margin: 0;
+  font-family: var(--sans); font-size: .88rem; color: var(--ink-soft);
+}
+.termos li b { font-family: var(--sans); color: var(--ink); font-weight: 650; }
+
+/* ---------- bibliografia e docente ---------- */
+
+.ref { border-top: 1px solid var(--rule-soft); padding: .8rem 0; font-size: .95rem; }
+.ref:last-of-type { border-bottom: 1px solid var(--rule-soft); }
+.ref .tag {
+  font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-mute); display: block; margin-bottom: .2rem;
+}
+
+.docente { display: grid; grid-template-columns: auto 1fr; gap: 1.2rem; align-items: start;
+  border: 1px solid var(--rule); background: var(--surface); padding: 1.2rem; }
+.docente .mark {
+  width: 3.4rem; height: 3.4rem; border: 1px solid var(--agente); color: var(--agente);
+  display: grid; place-items: center; font-family: var(--mono); font-size: 1.1rem;
+}
+.docente p { margin: 0 0 .6rem; font-size: .95rem; }
+.docente p:last-child { margin-bottom: 0; }
+
+footer {
+  margin-top: 4rem; border-top: 1px solid var(--rule); padding: 1.6rem 0 3rem;
+  font-family: var(--sans); font-size: .8rem; color: var(--ink-mute);
+}
+footer a { color: var(--ink-mute); }
+
+@media (max-width: 34rem) {
+  .aula { grid-template-columns: 1fr; gap: .4rem; }
+  .docente { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+html { scroll-behavior: smooth; }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>PPGI071</b> · Instituto de Computação · UFAL</div>
+    <a class="btn-line" href="https://github.com/glauberrleite/curso-aprendizado-de-maquina">Repositório</a>
+    <button class="btn-line" id="themeBtn" type="button">Tema: automático</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Disciplina · Pós-graduação e graduação</div>
+    <h1>Aprendizado de Máquina <em>por reforço</em></h1>
+    <p class="dek">
+      Uma oferta da disciplina inteiramente dedicada ao aprendizado por reforço: agentes que
+      aprendem <strong>interagindo</strong> com o ambiente, sem professor e sem rótulos,
+      guiados apenas por um número — a recompensa.
+    </p>
+    <div class="hero-fig">
+      <canvas id="loopCanvas" aria-label="Diagrama animado do laço agente-ambiente: o agente envia uma ação ao ambiente, que devolve o próximo estado e uma recompensa"></canvas>
+      <div class="hero-cap">
+        <span class="k-age">ação <span class="v">A</span><sub>t</sub></span>
+        <span class="k-amb">estado <span class="v">S</span><sub>t+1</sub></span>
+        <span class="k-rec">recompensa <span class="v">R</span><sub>t+1</sub></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <section id="aulas">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="n">§ 01</span>
+        <h2>Aulas</h2>
+        <span class="sub">Cada aula tem as <i>notas</i> em Markdown (referência escrita) e os
+        <i>slides</i> em HTML, que rodam no navegador — tecla <code>P</code> entra no modo apresentação.</span>
+      </div>
+
+      <div class="aula">
+        <div class="num">01</div>
+        <div>
+          <p class="t">Introdução ao aprendizado por reforço</p>
+          <p class="d">
+            O laço agente–ambiente, a convenção de índices, política, recompensa e retorno.
+            Por que <strong>recompensa não é valor</strong>, o dilema exploração × explotação e o
+            exemplo do jogo da velha aprendido por diferenças temporais.
+          </p>
+          <div class="links">
+            <a href="./01-introducao/aula.html">Slides</a>
+            <a href="https://github.com/glauberrleite/curso-aprendizado-de-maquina/blob/main/01-introducao/README.md">Notas</a>
+            <a href="https://github.com/glauberrleite/curso-aprendizado-de-maquina/blob/main/01-introducao/guia-aula.md">Guia de condução</a>
+            <a href="https://github.com/glauberrleite/curso-aprendizado-de-maquina/tree/main/01-introducao/scripts">Scripts</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="aula soon">
+        <div class="num">02</div>
+        <div>
+          <p class="t">Multi-armed bandits</p>
+          <p class="d">
+            O caso de um único estado. Médias amostrais, ε-guloso, valores iniciais otimistas,
+            UCB e gradiente de bandits.
+          </p>
+          <div class="links"><span>Em breve</span></div>
+        </div>
+      </div>
+
+      <div class="aula soon">
+        <div class="num">03</div>
+        <div>
+          <p class="t">Processos de decisão de Markov</p>
+          <p class="d">
+            A formalização completa: <span class="v">p</span>(<span class="v">s′</span>,<span class="v">r</span> | <span class="v">s</span>,<span class="v">a</span>),
+            retorno, funções de valor e as equações de Bellman.
+          </p>
+          <div class="links"><span>Em breve</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ementa">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="n">§ 02</span>
+        <h2>Ementa</h2>
+        <span class="sub">O percurso segue a ordem do Sutton &amp; Barto (2018), com implementação apoiada no Lapan (2024).</span>
+      </div>
+      <div class="ementa">
+        <div class="it done"><span class="n">01</span><span>Introdução ao aprendizado por reforço</span><span class="tag">aula 01</span></div>
+        <div class="it"><span class="n">02</span><span>Problema <i>multi-armed bandits</i></span><span class="tag"></span></div>
+        <div class="it"><span class="n">03</span><span>Processos de decisão de Markov</span><span class="tag"></span></div>
+        <div class="it"><span class="n">04</span><span>Métodos de Monte Carlo</span><span class="tag"></span></div>
+        <div class="it"><span class="n">05</span><span>Aprendizado por diferenças temporais</span><span class="tag"></span></div>
+        <div class="it"><span class="n">06</span><span><i>Bootstrapping</i> de n passos</span><span class="tag"></span></div>
+        <div class="it"><span class="n">07</span><span>Planejamento e aprendizado com métodos tabulares</span><span class="tag"></span></div>
+        <div class="it"><span class="n">08</span><span>Predição e controle <i>on-policy</i> com aproximação</span><span class="tag"></span></div>
+        <div class="it"><span class="n">09</span><span>Métodos <i>off-policy</i> com aproximação</span><span class="tag"></span></div>
+        <div class="it"><span class="n">10</span><span>Traços de elegibilidade</span><span class="tag"></span></div>
+        <div class="it"><span class="n">11</span><span>Métodos de gradiente de política</span><span class="tag"></span></div>
+        <div class="it"><span class="n">12</span><span>Aprendizado por reforço profundo</span><span class="tag"></span></div>
+      </div>
+      <div class="note">
+        <span class="lab">Objetivo da disciplina</span>
+        <p>Compreender a base formal e prática de algoritmos de aprendizado de máquina baseados na
+        <strong>interação explícita com o ambiente</strong> — do caso tabular, em que dá para
+        provar convergência, até a aproximação por redes profundas, em que não dá.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="avaliacao">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="n">§ 03</span>
+        <h2>Avaliação</h2>
+        <span class="sub">Dois projetos, sem prova escrita</span>
+      </div>
+      <ul>
+        <li><span class="v">P</span><sub>1</sub> — Projeto 1: nota de 0 a 10.</li>
+        <li><span class="v">P</span><sub>2</sub> — Projeto 2: nota de 0 a 10.</li>
+      </ul>
+      <div class="eq">
+        <span class="v">AV</span> =
+        <span class="frac"><span><span class="v">P</span><sub>1</sub> + <span class="v">P</span><sub>2</sub></span><span>2</span></span>
+      </div>
+      <div class="note rec">
+        <span class="lab">Ferramental</span>
+        <p>Os projetos usam <a href="https://gymnasium.farama.org/">Gymnasium</a> (o <i>fork</i>
+        mantido da antiga OpenAI Gym) como interface padrão de ambientes. Alternativas aceitas:
+        <a href="https://www.mathworks.com/products/reinforcement-learning.html">Reinforcement Learning Toolbox</a> (MATLAB),
+        <a href="https://genesis-world.readthedocs.io/en/latest/">Genesis</a> e
+        <a href="https://developer.nvidia.com/isaac/lab">NVIDIA Isaac Lab</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="bibliografia">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="n">§ 04</span>
+        <h2>Bibliografia</h2>
+      </div>
+      <div class="ref">
+        <span class="tag">Básica · livro-texto</span>
+        <strong>SUTTON, R. S.; BARTO, A. G.</strong> <i>Reinforcement Learning: An Introduction</i>.
+        2. ed. MIT Press, 2018.
+        <a href="http://incompleteideas.net/book/the-book-2nd.html">PDF oficial dos autores</a>.
+      </div>
+      <div class="ref">
+        <span class="tag">Básica · prática</span>
+        <strong>LAPAN, M.</strong> <i>Deep Reinforcement Learning Hands-on</i>. 3. ed. Packt, 2024.
+      </div>
+      <div class="ref">
+        <span class="tag">Complementar · ferramenta</span>
+        <i>Reinforcement Learning Toolbox</i> — MATLAB.
+        <a href="https://www.mathworks.com/products/reinforcement-learning.html">Documentação</a>.
+      </div>
+    </div>
+  </section>
+
+  <section id="glossario">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="n">§ 05</span>
+        <h2>Glossário e notação</h2>
+        <span class="sub">Notação do Sutton &amp; Barto (2018), usada na disciplina inteira. Em teoria de
+        controle é comum <span class="v">x</span> ≡ <span class="v">s</span> (estado) e
+        <span class="v">u</span> ≡ <span class="v">a</span> (ação).</span>
+      </div>
+      <div class="tbl-scroll">
+        <table class="tri">
+          <thead>
+            <tr><th>Símbolo</th><th>Nome</th><th>Quem produz</th><th>O que é</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="sym"><span class="v">t</span></td>
+              <td>passo de tempo</td><td class="quem">—</td>
+              <td>o tempo é discreto: <span class="v">t</span> = 0, 1, 2, …</td>
+            </tr>
+            <tr>
+              <td class="sym amb"><span class="v">S</span><sub>t</sub> ∈ 𝒮</td>
+              <td>estado</td><td class="quem">ambiente</td>
+              <td>o que o agente sabe no instante <span class="v">t</span></td>
+            </tr>
+            <tr>
+              <td class="sym age"><span class="v">A</span><sub>t</sub> ∈ 𝒜(<span class="v">s</span>)</td>
+              <td>ação</td><td class="quem"><strong>agente</strong></td>
+              <td>a única coisa que o agente controla</td>
+            </tr>
+            <tr>
+              <td class="sym rec"><span class="v">R</span><sub>t+1</sub> ∈ ℝ</td>
+              <td>recompensa</td><td class="quem">ambiente</td>
+              <td>avaliação imediata, escalar</td>
+            </tr>
+            <tr>
+              <td class="sym rec"><span class="v">G</span><sub>t</sub></td>
+              <td>retorno</td><td class="quem">—</td>
+              <td>soma descontada das recompensas futuras</td>
+            </tr>
+            <tr>
+              <td class="sym age">π(<span class="v">a</span> | <span class="v">s</span>)</td>
+              <td>política</td><td class="quem">agente</td>
+              <td>como escolher a ação</td>
+            </tr>
+            <tr>
+              <td class="sym rec"><span class="v">v</span><sub>π</sub>(<span class="v">s</span>)</td>
+              <td>valor do estado</td><td class="quem">agente (estima)</td>
+              <td>retorno esperado a partir de <span class="v">s</span></td>
+            </tr>
+            <tr>
+              <td class="sym rec"><span class="v">q</span><sub>π</sub>(<span class="v">s</span>,<span class="v">a</span>)</td>
+              <td>valor da ação</td><td class="quem">agente (estima)</td>
+              <td>retorno esperado fixando a primeira ação</td>
+            </tr>
+            <tr>
+              <td class="sym">γ ∈ [0,1]</td>
+              <td>desconto</td><td class="quem">projetista</td>
+              <td>quanto o futuro pesa</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note rec">
+        <span class="lab">Convenção de índices</span>
+        <p>A recompensa que <strong>resulta</strong> da ação <span class="v">A</span><sub>t</sub> é
+        <span class="v">R</span><sub>t+1</sub>, e não <span class="v">R</span><sub>t</sub>: o índice
+        marca quando o número chegou ao agente, junto com <span class="v">S</span><sub>t+1</sub>.</p>
+      </div>
+
+      <h3>Termos</h3>
+      <ul class="termos">
+        <li><b>Agente</b> — o processo de decisão. Controla apenas as ações.</li>
+        <li><b>Ambiente</b> — tudo o que o agente não controla arbitrariamente, inclusive os motores
+          e o corpo de um robô.</li>
+        <li><b>Trajetória</b> — a sequência <span class="v">S</span><sub>0</sub>,
+          <span class="v">A</span><sub>0</sub>, <span class="v">R</span><sub>1</sub>,
+          <span class="v">S</span><sub>1</sub>, <span class="v">A</span><sub>1</sub>,
+          <span class="v">R</span><sub>2</sub>, …</li>
+        <li><b>Feedback avaliativo</b> — diz quão boa foi a ação tomada, e nada sobre as demais (RL).
+          Oposto de <b>feedback instrutivo</b>, que diz qual era a ação correta (supervisionado).</li>
+        <li><b>Explotação</b> (<i>exploitation</i>) — escolher a ação de maior valor estimado.
+          <b>Exploração</b> (<i>exploration</i>) — escolher outra, para melhorar as estimativas.
+          O conflito entre as duas é permanente.</li>
+        <li><b>Consequência atrasada</b> (<i>delayed reward</i>) — uma ação afeta não só a recompensa
+          imediata, mas os estados e as recompensas seguintes.</li>
+        <li><b>Recompensa ≠ valor</b> — a recompensa vem do ambiente e é imediata; o valor é uma
+          previsão do agente sobre o futuro. Decidimos sobre o valor.</li>
+        <li><b>Tarefa episódica × contínua</b> — se a interação se quebra em episódios, γ = 1 é
+          permitido; se nunca termina, é preciso γ &lt; 1 para o retorno convergir.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="docente">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="n">§ 06</span>
+        <h2>Docente</h2>
+      </div>
+      <div class="docente">
+        <div class="mark">GL</div>
+        <div>
+          <p><strong>Prof. Glauber Rodrigues Leite</strong> — Instituto de Computação,
+          Universidade Federal de Alagoas.</p>
+          <p>Pesquisa e ensino em sistemas inteligentes, robótica e aprendizado de máquina.
+          Página pessoal: <a href="https://glauberrleite.com/">glauberrleite.com</a>.</p>
+          <p>Dúvidas sobre a disciplina: preferencialmente por
+          <a href="https://github.com/glauberrleite/curso-aprendizado-de-maquina/issues">issues no repositório</a>,
+          para que a resposta fique disponível à turma inteira.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      Material sob licença MIT · código-fonte em
+      <a href="https://github.com/glauberrleite/curso-aprendizado-de-maquina">github.com/glauberrleite/curso-aprendizado-de-maquina</a><br>
+      As páginas de aula funcionam sem internet: basta abrir o arquivo <code>.html</code> no navegador.
+    </div>
+  </footer>
+
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var root = document.documentElement;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var TAU = Math.PI * 2;
+
+  function css(n) { return getComputedStyle(root).getPropertyValue(n).trim(); }
+
+  /* ---------------- tema ---------------- */
+  var modes = ["auto", "light", "dark"];
+  var labels = { auto: "Tema: automático", light: "Tema: claro", dark: "Tema: escuro" };
+  var mi = 0, btn = document.getElementById("themeBtn");
+  btn.addEventListener("click", function () {
+    mi = (mi + 1) % modes.length;
+    var m = modes[mi];
+    if (m === "auto") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", m);
+    btn.textContent = labels[m];
+    draw(phase);
+  });
+
+  /* ---------------- laço agente-ambiente ---------------- */
+  var cv = document.getElementById("loopCanvas");
+
+  function fit(canvas) {
+    var r = canvas.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return null;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, r.width, r.height);
+    return { ctx: ctx, w: r.width, h: r.height };
+  }
+
+  function box(ctx, x, y, w, h, cor, titulo) {
+    ctx.save();
+    ctx.strokeStyle = cor; ctx.lineWidth = 1.4;
+    ctx.fillStyle = css("--surface");
+    ctx.beginPath(); ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = cor;
+    ctx.font = "600 13px " + css("--sans").split(",")[0].replace(/"/g, "");
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(titulo, x, y);
+    ctx.restore();
+  }
+
+  /* caminho fechado: sai do agente pelo topo, entra no ambiente,
+     volta por baixo. Parametrizado em u de 0 a 1. */
+  function ponto(u, ax, bx, y, r) {
+    var span = bx - ax;
+    if (u < 0.5) {                      // ida: arco superior
+      var t = u / 0.5;
+      return [ax + span * t, y - r * Math.sin(Math.PI * t)];
+    }
+    var t2 = (u - 0.5) / 0.5;           // volta: arco inferior
+    return [bx - span * t2, y + r * Math.sin(Math.PI * t2)];
+  }
+
+  function seta(ctx, x, y, dx, dy, cor) {
+    var n = Math.hypot(dx, dy) || 1;
+    dx /= n; dy /= n;
+    ctx.save(); ctx.fillStyle = cor;
+    ctx.beginPath();
+    ctx.moveTo(x + dx * 7, y + dy * 7);
+    ctx.lineTo(x - dy * 4.5 - dx * 3, y + dx * 4.5 - dy * 3);
+    ctx.lineTo(x + dy * 4.5 - dx * 3, y - dx * 4.5 - dy * 3);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  /* "ação  A" + índice "t" em corpo menor, tudo centrado em x */
+  function rotulo(ctx, x, y, texto, simbolo, indice, cor) {
+    var fam = css("--sans").split(",")[0].replace(/"/g, "") || "sans-serif";
+    ctx.save();
+    ctx.textBaseline = "middle";
+    ctx.font = "12px " + fam;
+    var w1 = ctx.measureText(texto).width;
+    ctx.font = "italic 13px " + fam;
+    var w2 = ctx.measureText(simbolo).width;
+    ctx.font = "9px " + fam;
+    var w3 = ctx.measureText(indice).width;
+    var x0 = x - (w1 + w2 + w3) / 2;
+    ctx.fillStyle = cor; ctx.textAlign = "left";
+    ctx.font = "12px " + fam;      ctx.fillText(texto, x0, y);
+    ctx.font = "italic 13px " + fam; ctx.fillText(simbolo, x0 + w1, y);
+    ctx.font = "9px " + fam;       ctx.fillText(indice, x0 + w1 + w2, y + 4);
+    ctx.restore();
+  }
+
+  var phase = 0;
+
+  function draw(ph) {
+    var f = fit(cv);
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, h = f.h;
+    var cy = h / 2;
+    var bw = Math.min(150, w * 0.26), bh = 46;
+    var ax = w / 2 - Math.min(190, w * 0.28);
+    var bx = w / 2 + Math.min(190, w * 0.28);
+    var r = Math.min(42, (h - bh) / 2 - 34);
+
+    /* trilha */
+    ctx.save();
+    ctx.strokeStyle = css("--rule"); ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (var i = 0; i <= 240; i++) {
+      var p = ponto(i / 240, ax, bx, cy, r);
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    /* setas de sentido */
+    var pIda = ponto(0.25, ax, bx, cy, r), pIda2 = ponto(0.27, ax, bx, cy, r);
+    seta(ctx, pIda[0], pIda[1], pIda2[0] - pIda[0], pIda2[1] - pIda[1], css("--agente"));
+    var pVol = ponto(0.75, ax, bx, cy, r), pVol2 = ponto(0.77, ax, bx, cy, r);
+    seta(ctx, pVol[0], pVol[1], pVol2[0] - pVol[0], pVol2[1] - pVol[1], css("--ambiente"));
+
+    /* rótulos: base em versalete e índice em corpo menor */
+    rotulo(ctx, w / 2, cy - r - 8, "ação  ", "A", "t", css("--agente"));
+    rotulo(ctx, w / 2, cy + r + 20, "estado  ", "S", "t+1", css("--ambiente"));
+    rotulo(ctx, w / 2, cy + r + 38, "recompensa  ", "R", "t+1", css("--recompensa"));
+
+    /* pulso */
+    var p = ponto(ph, ax, bx, cy, r);
+    ctx.save();
+    ctx.fillStyle = ph < 0.5 ? css("--agente") : css("--recompensa");
+    ctx.beginPath(); ctx.arc(p[0], p[1], 5.5, 0, TAU); ctx.fill();
+    ctx.globalAlpha = .25;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 11, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    box(ctx, ax, cy, bw, bh, css("--agente"), "agente");
+    box(ctx, bx, cy, bw, bh, css("--ambiente"), "ambiente");
+  }
+
+  function tick() {
+    phase = (phase + 0.0035) % 1;
+    draw(phase);
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener("resize", function () { draw(phase); });
+  draw(phase);
+  if (!reduce) tick();
+})();
+</script>

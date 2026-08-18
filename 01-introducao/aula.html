@@ -1,0 +1,2462 @@
+<meta charset="utf-8">
+<title>Introdução ao aprendizado por reforço — aprender agindo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* ============================================================
+   PPGI071 — Aprendizado de Máquina (Aprendizado por Reforço)
+   Aula 01 · Introdução
+   Registro visual: caderno de laboratório / instrumentação.
+   Acentos com significado fixo:
+     --agente     (violeta) = agente, ação, política
+     --ambiente   (teal)    = ambiente, estado, transição
+     --recompensa (âmbar)   = recompensa, retorno, valor
+     --alerta     (vermelho)= limitação, armadilha, erro comum
+
+   Dois modos sobre o MESMO DOM:
+     documento     — .slide é display:contents (some do layout)
+     apresentação  — .slide vira slide de tela cheia
+
+   ESCALA NA APRESENTAÇÃO
+   No modo apresentação a fonte da RAIZ cresce com a viewport, então
+   todo tamanho em rem (botões, rótulos, leituras das demos) acompanha.
+   --ps é o zoom manual (A− / A+).
+   ============================================================ */
+
+:root {
+  --paper:      #f2f4f6;
+  --surface:    #ffffff;
+  --surface-2:  #e9ecf0;
+  --ink:        #141a20;
+  --ink-soft:   #46525e;
+  --ink-mute:   #6d7a88;
+  --rule:       #d5dae1;
+  --rule-soft:  #e5e8ed;
+
+  --agente:     #5645b8;
+  --agente-bg:  #e7e4f7;
+  --ambiente:   #0d6e7d;
+  --ambiente-bg:#dfeef0;
+  --recompensa: #a8620a;
+  --recompensa-bg:#f6ecdd;
+  --alerta:     #9d332e;
+  --alerta-bg:  #f7e7e5;
+
+  --serif: ui-serif, "Iowan Old Style", Charter, "Bitstream Charter", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans:  ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono:  ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --measure: 68ch;
+  --rail: 15rem;
+  --ps: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:#0e1216; --surface:#161c22; --surface-2:#1e262e;
+    --ink:#e4e9ee; --ink-soft:#b4c0ca; --ink-mute:#8593a1;
+    --rule:#28323c; --rule-soft:#1d252d;
+    --agente:#a99cf0; --agente-bg:#211d3a;
+    --ambiente:#55c0d2; --ambiente-bg:#102a30;
+    --recompensa:#e2a355; --recompensa-bg:#2a2013;
+    --alerta:#e2867d; --alerta-bg:#2c1817;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#0e1216; --surface:#161c22; --surface-2:#1e262e;
+  --ink:#e4e9ee; --ink-soft:#b4c0ca; --ink-mute:#8593a1;
+  --rule:#28323c; --rule-soft:#1d252d;
+  --agente:#a99cf0; --agente-bg:#211d3a;
+  --ambiente:#55c0d2; --ambiente-bg:#102a30;
+  --recompensa:#e2a355; --recompensa-bg:#2a2013;
+  --alerta:#e2867d; --alerta-bg:#2c1817;
+}
+:root[data-theme="light"] {
+  --paper:#f2f4f6; --surface:#ffffff; --surface-2:#e9ecf0;
+  --ink:#141a20; --ink-soft:#46525e; --ink-mute:#6d7a88;
+  --rule:#d5dae1; --rule-soft:#e5e8ed;
+  --agente:#5645b8; --agente-bg:#e7e4f7;
+  --ambiente:#0d6e7d; --ambiente-bg:#dfeef0;
+  --recompensa:#a8620a; --recompensa-bg:#f6ecdd;
+  --alerta:#9d332e; --alerta-bg:#f7e7e5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- estrutura ---------- */
+
+.shell { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); }
+
+.rail {
+  position: sticky; top: 0; height: 100vh;
+  padding: 2rem 1.25rem 2rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  display: flex; flex-direction: column; gap: 1.2rem;
+  overflow-y: auto;
+}
+.rail-brand {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-mute); line-height: 1.5;
+}
+.rail-brand b { color: var(--ink); font-weight: 600; display: block; letter-spacing: .1em; }
+
+.rail nav { display: flex; flex-direction: column; }
+.rail nav a {
+  display: grid; grid-template-columns: 1.9rem 1fr; gap: .45rem; align-items: baseline;
+  padding: .3rem 0; text-decoration: none; color: var(--ink-soft);
+  font-family: var(--sans); font-size: .78rem; line-height: 1.25;
+  border-top: 1px solid var(--rule-soft);
+}
+.rail nav a:first-child { border-top: 0; }
+.rail nav a .n { font-family: var(--mono); font-size: .66rem; color: var(--ink-mute); }
+.rail nav a:hover { color: var(--ink); }
+.rail nav a.on, .rail nav a.on .n { color: var(--agente); }
+
+.rail-foot {
+  margin-top: auto; font-family: var(--sans); font-size: .75rem;
+  color: var(--ink-mute); display: flex; flex-direction: column; gap: .5rem;
+}
+.rail-btn {
+  font-family: var(--mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase;
+  background: transparent; color: var(--ink-mute); border: 1px solid var(--rule);
+  padding: .45rem .6rem; cursor: pointer; text-align: left; text-decoration: none;
+}
+.rail-btn:hover { color: var(--ink); border-color: var(--ink-mute); }
+.rail-btn.accent { color: var(--agente); border-color: var(--agente); }
+.rail-btn.accent:hover { background: var(--agente); color: var(--paper); }
+
+main { padding: 0 0 8rem; min-width: 0; }
+.wrap { max-width: var(--measure); padding: 0 2.5rem; }
+.slide { display: contents; }
+
+/* ---------- capa ---------- */
+
+.hero {
+  border-bottom: 1px solid var(--rule);
+  padding: 4.5rem 0 2.5rem;
+  background-image:
+    linear-gradient(to right, var(--rule-soft) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rule-soft) 1px, transparent 1px);
+  background-size: 28px 28px; background-position: -1px -1px;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-mute);
+}
+h1 {
+  font-size: clamp(2.1rem, 4.4vw, 3.15rem); line-height: 1.08; font-weight: 600;
+  letter-spacing: -0.018em; margin: .7rem 0 0; text-wrap: balance; max-width: 20ch;
+}
+h1 em { font-style: italic; color: var(--agente); }
+.dek { margin: 1.1rem 0 0; font-size: 1.15rem; color: var(--ink-soft); max-width: 52ch; }
+
+.hero-fig { margin-top: 2.2rem; }
+.hero-fig canvas {
+  display: block; width: 100%; height: 210px;
+  border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
+.hero-cap {
+  margin-top: .55rem; font-family: var(--sans); font-size: .78rem;
+  color: var(--ink-mute); display: flex; gap: 1.4rem; flex-wrap: wrap;
+}
+.hero-cap span::before {
+  content: ""; display: inline-block; width: 1.5rem; height: 0;
+  border-top: 2px solid currentColor; vertical-align: middle; margin-right: .45rem;
+}
+.hero-cap .k-age { color: var(--agente); }
+.hero-cap .k-amb { color: var(--ambiente); }
+.hero-cap .k-rec { color: var(--recompensa); }
+
+/* ---------- títulos de seção ---------- */
+
+.sec-head { margin: 3.4rem 0 1.4rem; }
+.sec-head .n {
+  font-family: var(--mono); font-size: .7rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-mute);
+}
+h2 {
+  font-size: clamp(1.55rem, 2.6vw, 2rem); line-height: 1.15; font-weight: 600;
+  letter-spacing: -0.012em; margin: .35rem 0 0; text-wrap: balance;
+}
+.sec-head .sub {
+  display: block; margin-top: .4rem; font-family: var(--sans);
+  font-size: .88rem; color: var(--ink-mute); max-width: 54ch;
+}
+h3 {
+  font-family: var(--sans); font-size: .95rem; font-weight: 650;
+  letter-spacing: .01em; margin: 2rem 0 .6rem;
+}
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.05rem; padding-left: 1.25rem; }
+li { margin: 0 0 .4rem; }
+a { color: var(--agente); text-underline-offset: 2px; }
+strong { font-weight: 650; }
+code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); padding: .05em .3em; }
+:focus-visible { outline: 2px solid var(--agente); outline-offset: 2px; }
+
+/* ---------- definições, citações, avisos ---------- */
+
+.defn {
+  border-left: 2px solid var(--agente); background: var(--agente-bg);
+  padding: .95rem 1.2rem; margin: 0 0 1.1rem;
+}
+.defn .lab {
+  display: block; font-family: var(--mono); font-size: .66rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--agente); margin-bottom: .3rem;
+}
+.defn p { margin: 0 0 .7rem; }
+.defn p:last-child { margin-bottom: 0; }
+.defn ul { margin: .5rem 0 0; }
+.defn.amb { border-left-color: var(--ambiente); background: var(--ambiente-bg); }
+.defn.amb .lab { color: var(--ambiente); }
+.defn.rec { border-left-color: var(--recompensa); background: var(--recompensa-bg); }
+.defn.rec .lab { color: var(--recompensa); }
+
+blockquote {
+  margin: 0 0 1.1rem; padding: 0 0 0 1.2rem;
+  border-left: 1px solid var(--rule); color: var(--ink-soft);
+}
+blockquote cite {
+  display: block; margin-top: .5rem; font-style: normal;
+  font-family: var(--sans); font-size: .78rem; color: var(--ink-mute);
+}
+
+.note {
+  border: 1px solid var(--rule); border-left: 2px solid var(--ink-mute);
+  padding: .8rem 1.1rem; margin: 0 0 1.1rem; background: var(--surface);
+}
+.note.problema { border-left-color: var(--alerta); background: var(--alerta-bg); }
+.note.problema .lab { color: var(--alerta); }
+.note .lab {
+  display: block; font-family: var(--mono); font-size: .66rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-mute); margin-bottom: .3rem;
+}
+.note p { margin: 0 0 .55rem; }
+.note p:last-child { margin-bottom: 0; }
+
+/* ---------- matemática ---------- */
+
+.eq {
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.35;
+  text-align: center; margin: 1.4rem 0; overflow-x: auto; padding: .35rem 0;
+}
+.eq small { display: block; font-family: var(--sans); font-size: .72rem; color: var(--ink-mute); margin-top: .45rem; }
+.v { font-style: italic; }
+.frac {
+  display: inline-flex; flex-direction: column; vertical-align: middle;
+  text-align: center; margin: 0 .18em;
+}
+.frac > span:first-child { border-bottom: 1px solid currentColor; padding: 0 .4em .12em; }
+.frac > span:last-child { padding: .12em .4em 0; }
+.sum { font-size: 1.35em; vertical-align: -0.22em; line-height: .8; margin-right: .12em; }
+.op-age { color: var(--agente); }
+.op-amb { color: var(--ambiente); }
+.op-rec { color: var(--recompensa); }
+
+/* ---------- "expandir" (detalhe que não cabe projetado) ---------- */
+
+.mais {
+  border: 1px solid var(--rule); border-left: 2px solid var(--ink-mute);
+  background: var(--surface); margin: 0 0 1.1rem;
+}
+.mais > summary {
+  cursor: pointer; list-style: none; padding: .5rem .9rem;
+  font-family: var(--sans); font-size: .78rem; font-weight: 600;
+  color: var(--ink-soft); display: flex; align-items: center; gap: .5rem;
+}
+.mais > summary::-webkit-details-marker { display: none; }
+.mais > summary::before {
+  content: "+"; font-family: var(--mono); font-size: 1rem; line-height: 1;
+  color: var(--agente); width: .7rem; text-align: center;
+}
+.mais[open] > summary::before { content: "−"; }
+.mais > summary:hover { color: var(--ink); }
+.mais .corpo { padding: .1rem .9rem .75rem 2.1rem; font-size: .95rem; color: var(--ink-soft); }
+.mais .corpo > :last-child { margin-bottom: 0; }
+.mais .corpo p { margin-bottom: .6rem; }
+.mais .corpo ul { margin-bottom: .6rem; }
+
+/* duas colunas de bullets curtos */
+.duo-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0 1.6rem; }
+.duo-lista ul { margin-bottom: .4rem; }
+
+/* ---------- demos ---------- */
+
+.demo { border: 1px solid var(--rule); background: var(--surface); margin: 1.3rem 0; }
+.demo-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  flex-wrap: wrap; padding: .7rem 1.1rem;
+  border-bottom: 1px solid var(--rule); background: var(--surface-2);
+}
+.demo-head .t { font-family: var(--sans); font-size: .78rem; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.demo-head .h { font-family: var(--sans); font-size: .76rem; color: var(--ink-mute); }
+.demo-body { padding: 1.1rem; }
+
+.ctl { display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; margin-bottom: .9rem; }
+
+button.b {
+  font-family: var(--sans); font-size: .8rem; font-weight: 550; padding: .42rem .85rem;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer;
+}
+button.b:hover { border-color: var(--ink-mute); }
+button.b.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button.b:disabled { opacity: .45; cursor: default; }
+
+.seg { display: inline-flex; flex-wrap: wrap; max-width: 100%; border: 1px solid var(--rule); }
+.seg button {
+  font-family: var(--sans); font-size: .78rem; padding: .4rem .8rem;
+  border: 0; border-left: 1px solid var(--rule);
+  background: var(--surface); color: var(--ink-soft); cursor: pointer;
+}
+.seg button:first-child { border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+.readout {
+  display: flex; gap: 1.8rem; flex-wrap: wrap;
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .82rem;
+  margin-top: .9rem; padding-top: .8rem; border-top: 1px solid var(--rule-soft);
+}
+.readout div { display: flex; flex-direction: column; gap: .15rem; }
+.readout .k { font-size: .64rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); }
+.readout .val { font-size: 1.15rem; }
+.readout .val.age { color: var(--agente); }
+.readout .val.amb { color: var(--ambiente); }
+.readout .val.rec { color: var(--recompensa); }
+.readout .val.ale { color: var(--alerta); }
+
+canvas.plot { display: block; width: 100%; height: 250px; touch-action: none; }
+canvas.plot.curto { height: 170px; }
+canvas.plot.alto { height: 300px; }
+
+.sliders { display: flex; flex-direction: column; gap: .55rem; margin-bottom: .9rem; }
+.sld { display: grid; grid-template-columns: 12rem 1fr 4.6rem; gap: .6rem; align-items: center; }
+.sld > label { font-family: var(--sans); font-size: .8rem; color: var(--ink-soft); }
+.sld > output {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: .85rem; color: var(--agente); text-align: right;
+}
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 1.05rem;
+  background: transparent; cursor: pointer; margin: 0;
+}
+input[type="range"]::-webkit-slider-runnable-track { height: .3rem; background: var(--rule); border: 0; }
+input[type="range"]::-moz-range-track { height: .3rem; background: var(--rule); border: 0; }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: .95rem; height: .95rem; margin-top: -.33rem;
+  background: var(--agente); border: 0; border-radius: 50%;
+}
+input[type="range"]::-moz-range-thumb {
+  width: .95rem; height: .95rem; background: var(--agente); border: 0; border-radius: 50%;
+}
+label.inl { font-family: var(--sans); font-size: .82rem; color: var(--ink-soft); display: inline-flex; align-items: center; gap: .4rem; }
+
+.verdict { font-family: var(--sans); font-size: .82rem; margin-top: .8rem; padding: .5rem .7rem; border-left: 2px solid; }
+.verdict.ok { color: var(--ambiente); border-color: var(--ambiente); background: var(--ambiente-bg); }
+.verdict.rec { color: var(--recompensa); border-color: var(--recompensa); background: var(--recompensa-bg); }
+.verdict.bad { color: var(--alerta); border-color: var(--alerta); background: var(--alerta-bg); }
+
+/* trajetória (fita de S, A, R) */
+.traj {
+  font-family: var(--mono); font-size: .8rem; line-height: 1.9;
+  border: 1px solid var(--rule-soft); background: var(--surface-2);
+  padding: .6rem .7rem; margin-top: .9rem; max-height: 7.5rem; overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.traj .s { color: var(--ambiente); }
+.traj .a { color: var(--agente); }
+.traj .r { color: var(--recompensa); }
+.traj .t0 { color: var(--ink-mute); }
+
+/* barras de comparação */
+.bar-wrap { margin-top: .9rem; }
+.bar-row {
+  display: grid; grid-template-columns: 9.5rem 1fr 5.4rem; gap: .6rem; align-items: center;
+  font-family: var(--sans); font-size: .78rem; color: var(--ink-soft); margin-bottom: .45rem;
+}
+.bar-row .bar { height: .85rem; background: var(--surface-2); position: relative; }
+.bar-row .bar i { display: block; height: 100%; background: var(--ink-mute); transition: width .12s linear; }
+.bar-row.win .bar i { background: var(--recompensa); }
+.bar-row .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); }
+
+/* tabuleiro de valores (jogo da velha) */
+.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: var(--rule); border: 1px solid var(--rule); max-width: 15rem; }
+.board div {
+  aspect-ratio: 1; background: var(--surface); display: grid; place-items: center;
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: .95rem;
+}
+.board div span { position: relative; z-index: 1; }
+.board div { position: relative; }
+.board div::before {
+  content: ""; position: absolute; inset: 0; background: var(--recompensa);
+  opacity: var(--fill, 0);
+}
+.board-wrap { display: grid; grid-template-columns: 15rem 1fr; gap: 1.2rem; align-items: center; }
+@media (max-width: 40rem) { .board-wrap { grid-template-columns: 1fr; } }
+
+/* ---------- exercícios ---------- */
+
+.ex {
+  border: 1px solid var(--rule); border-left: 2px solid var(--recompensa);
+  padding: .95rem 1.1rem; margin: 0 0 .9rem; background: var(--surface);
+}
+.ex .lab {
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--recompensa); display: block; margin-bottom: .35rem;
+}
+.ex p { margin: 0 0 .8rem; }
+.ex .sol { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--rule-soft); }
+.ex .sol[hidden] { display: none; }
+.ex .sol p:last-child { margin-bottom: 0; }
+.ex .sol .res { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 1.15rem; color: var(--recompensa); }
+
+/* ---------- figuras e tabelas ---------- */
+
+figure { margin: 1.3rem 0; }
+figure img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--rule); background: #fff;
+}
+figcaption { font-family: var(--sans); font-size: .78rem; color: var(--ink-mute); margin-top: .5rem; }
+
+.tri { width: 100%; border-collapse: collapse; margin: 1.2rem 0; }
+.tri th, .tri td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.tri th {
+  font-family: var(--sans); font-size: .7rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-mute); font-weight: 600;
+}
+.tri td { font-family: var(--sans); font-size: .85rem; }
+.tri td.p { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--agente); font-size: 1.02rem; }
+.tri td.q { font-family: var(--mono); font-size: .88rem; color: var(--ink-soft); }
+.tbl-scroll { overflow-x: auto; }
+
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1.2rem; }
+
+/* linha do tempo (história) */
+.tl { border-left: 1px solid var(--rule); padding-left: 1.1rem; margin: 1.2rem 0; }
+.tl .it { position: relative; padding: 0 0 1rem; font-family: var(--sans); font-size: .88rem; }
+.tl .it::before {
+  content: ""; position: absolute; left: -1.42rem; top: .45rem;
+  width: .5rem; height: .5rem; background: var(--agente);
+}
+.tl .it b { font-family: var(--mono); font-size: .8rem; color: var(--agente); margin-right: .5rem; }
+
+/* ============================================================
+   MODO APRESENTAÇÃO
+   ============================================================ */
+
+.hud { display: none; }
+
+:root[data-mode="present"] { font-size: calc(clamp(15px, 1.45vw, 30px) * var(--ps)); }
+
+:root[data-mode="present"] body { overflow: hidden; font-size: 1.12rem; line-height: 1.5; }
+:root[data-mode="present"] .rail { display: none; }
+:root[data-mode="present"] .shell { display: block; }
+:root[data-mode="present"] main { padding: 0; }
+:root[data-mode="present"] section,
+:root[data-mode="present"] .wrap,
+:root[data-mode="present"] .hero { display: contents; }
+
+:root[data-mode="present"] .slide { display: none; }
+:root[data-mode="present"] .slide.on {
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: .7rem; position: fixed; inset: 0;
+  padding: 1.6rem clamp(1rem, 4vw, 4rem) 2.9rem;
+  overflow-y: auto; background: var(--paper);
+}
+:root[data-mode="present"] .defn,
+:root[data-mode="present"] .note,
+:root[data-mode="present"] .ex,
+:root[data-mode="present"] .mais,
+:root[data-mode="present"] blockquote { margin-bottom: 0; }
+:root[data-mode="present"] li { margin-bottom: .5rem; }
+:root[data-mode="present"] .slide.on > * { width: 100%; max-width: 54rem; }
+:root[data-mode="present"] .slide.on > .sec-head { margin: 0 0 .2rem; }
+
+:root[data-mode="present"] h1 { font-size: 3rem; max-width: 22ch; }
+:root[data-mode="present"] h2 { font-size: 2rem; }
+:root[data-mode="present"] h3 { margin-top: 0; }
+:root[data-mode="present"] .dek { font-size: 1.35rem; max-width: 44ch; }
+:root[data-mode="present"] .eq { font-size: 1.6rem; margin: .9rem 0; }
+:root[data-mode="present"] canvas.plot { height: clamp(190px, 34vh, 460px); }
+:root[data-mode="present"] canvas.plot.curto { height: clamp(140px, 22vh, 300px); }
+:root[data-mode="present"] .hero-fig canvas { height: clamp(140px, 24vh, 340px); }
+:root[data-mode="present"] figure img { max-height: 46vh; object-fit: contain; }
+:root[data-mode="present"] .sliders { gap: .35rem; margin-bottom: .6rem; }
+:root[data-mode="present"] .ctl { margin-bottom: .6rem; }
+:root[data-mode="present"] .traj { max-height: 22vh; }
+:root[data-mode="present"] .sec-head { margin: 0 0 1rem; }
+
+:root[data-mode="present"] .hud {
+  display: flex; align-items: center; gap: .7rem;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  padding: .4rem clamp(.6rem, 2vw, 2rem);
+  background: var(--surface); border-top: 1px solid var(--rule);
+  font-family: var(--sans); font-size: clamp(12px, .55rem, 20px); color: var(--ink-mute);
+}
+.hud .where { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hud .where b { color: var(--ink); font-weight: 600; }
+.hud .count, .hud .zoom {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: .04em; white-space: nowrap;
+}
+.hud button {
+  font-family: var(--sans); font-size: inherit; padding: .25rem .6rem;
+  border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.hud button:hover { border-color: var(--ink-mute); }
+.hud .sep { width: 1px; align-self: stretch; background: var(--rule); }
+.hud .bar { position: absolute; left: 0; top: -1px; height: 2px; background: var(--agente); transition: width .18s ease; }
+
+/* ---------- responsivo ---------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); padding: 1.5rem; }
+  .rail nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0 1.2rem; }
+  .rail-foot { margin-top: 1rem; }
+  .wrap { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .sld { grid-template-columns: 8.5rem 1fr 4.2rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <div class="rail-brand">
+      <b>PPGI071</b>
+      Aprendizado por Reforço · Aula 01<br>
+      Instituto de Computação · UFAL
+    </div>
+    <nav id="toc">
+      <a href="#motivacao"><span class="n">01</span><span>Aprender pela interação</span></a>
+      <a href="#campos"><span class="n">02</span><span>Onde o RL se encaixa</span></a>
+      <a href="#laco"><span class="n">03</span><span>O laço agente–ambiente</span></a>
+      <a href="#politica"><span class="n">04</span><span>Política e hipótese da recompensa</span></a>
+      <a href="#valor"><span class="n">05</span><span>Recompensa não é valor</span></a>
+      <a href="#exploracao"><span class="n">06</span><span>Exploração × explotação</span></a>
+      <a href="#elementos"><span class="n">07</span><span>Os elementos do RL</span></a>
+      <a href="#velha"><span class="n">08</span><span>Exemplo: jogo da velha</span></a>
+      <a href="#limites"><span class="n">09</span><span>Limites e dificuldades</span></a>
+      <a href="#historia"><span class="n">10</span><span>Três fios da história</span></a>
+      <a href="#sintese"><span class="n">11</span><span>Síntese e atividades</span></a>
+    </nav>
+    <div class="rail-foot">
+      <button class="rail-btn accent" id="presentBtn" type="button">▶ Modo apresentação</button>
+      <button class="rail-btn" id="themeBtn" type="button">Tema: automático</button>
+      <a class="rail-btn" href="../index.html">← Página da disciplina</a>
+      <span>Prof. Glauber R. Leite</span>
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- ============ CAPA ============ -->
+    <header class="hero">
+      <div class="wrap">
+        <div class="slide" data-sec="Abertura">
+          <div>
+            <div class="eyebrow">Aula 01 · Introdução ao aprendizado por reforço</div>
+            <h1>Aprender <em>agindo</em></h1>
+            <p class="dek">
+              Sem professor e sem rótulos: um agente, um ambiente e um único número.
+            </p>
+          </div>
+          <div class="hero-fig">
+            <canvas id="heroCanvas" aria-label="Diagrama animado do laço agente-ambiente: o agente envia uma ação; o ambiente devolve o próximo estado e uma recompensa"></canvas>
+            <div class="hero-cap">
+              <span class="k-age">ação escolhida pelo agente</span>
+              <span class="k-amb">estado devolvido pelo ambiente</span>
+              <span class="k-rec">recompensa</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ 01 ============ -->
+    <section id="motivacao">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 01 · Aprender pela interação">
+          <div class="sec-head">
+            <span class="n">§ 01</span>
+            <h2>Uma criança brincando não tem professor</h2>
+            <span class="sub">E, mesmo assim, aprende</span>
+          </div>
+          <ul>
+            <li>Explorar produz informação sobre <strong>causa e efeito</strong>.</li>
+            <li>As <strong>consequências</strong> dos próprios atos são o material de estudo.</li>
+            <li>Aprende-se <strong>o que fazer</strong> para <strong>alcançar objetivos</strong>.</li>
+            <li>Ninguém entrega uma tabela de pares (situação, ação correta).</li>
+          </ul>
+          <div class="note">
+            <span class="lab">A pergunta que guia a aula</span>
+            <p>Como transformar isso em <strong>algoritmo</strong>? Do que precisamos, além das
+            observações do ambiente?</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 01 · Aprender pela interação">
+          <h3>Falta um sinal</h3>
+          <figure>
+            <img src="./media/agent.png" alt="Diagrama de dois círculos: agente e ambiente. Do agente para o ambiente sai uma seta de ações; do ambiente para o agente voltam duas setas, recompensa e observações.">
+            <figcaption>O laço básico (Lapan, 2024). Do ambiente voltam <strong>duas</strong> coisas:
+            observações e <strong>recompensa</strong>.</figcaption>
+          </figure>
+          <div class="defn rec">
+            <span class="lab">O sinal que falta</span>
+            <p>A recompensa é um <strong>escalar</strong>: um único número por passo de tempo.
+            Todo o "o que queremos" precisa caber ali.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 02 ============ -->
+    <section id="campos">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 02 · Onde o RL se encaixa">
+          <div class="sec-head">
+            <span class="n">§ 02</span>
+            <h2>Nem supervisionado, nem não supervisionado</h2>
+            <span class="sub">Um terceiro paradigma</span>
+          </div>
+          <div class="tbl-scroll">
+            <table class="tri">
+              <thead>
+                <tr><th></th><th>Supervisionado</th><th>Não superv.</th><th>Por reforço</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Dado</strong></td><td>pares (entrada, rótulo)</td><td>entradas sem rótulo</td><td>experiência do <strong>próprio agente</strong></td></tr>
+                <tr><td><strong>Sinal</strong></td><td>a resposta correta</td><td>nenhum</td><td><strong>avaliação</strong> da ação tomada</td></tr>
+                <tr><td><strong>Objetivo</strong></td><td>generalizar o rótulo</td><td>achar estrutura</td><td><strong>maximizar</strong> recompensa</td></tr>
+                <tr><td><strong>Dados</strong></td><td>fixos, i.i.d.</td><td>fixos</td><td><strong>mudam</strong> com a política</td></tr>
+                <tr><td><strong>Tempo</strong></td><td>irrelevante</td><td>irrelevante</td><td><strong>é do problema</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 02 · Onde o RL se encaixa">
+          <h3>A diferença que mais dói</h3>
+          <div class="cols2">
+            <div class="defn amb">
+              <span class="lab">Feedback instrutivo</span>
+              <p>Diz <strong>qual era a ação certa</strong> — independentemente do que você fez.
+              É o aprendizado supervisionado.</p>
+            </div>
+            <div class="defn">
+              <span class="lab">Feedback avaliativo</span>
+              <p>Diz apenas <strong>quão boa foi a ação tomada</strong>. Nada sobre as que você
+              não tomou. É o RL.</p>
+            </div>
+          </div>
+          <div class="note problema">
+            <span class="lab">Consequência</span>
+            <p>Cada melhoria de política muda os estados visitados — e portanto muda os dados de
+            treino. <strong>O alvo se move enquanto se aprende.</strong></p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 02 · Onde o RL se encaixa">
+          <blockquote>
+            RL is the third camp and lies somewhere in between full supervision and a complete
+            lack of predefined labels. On the one hand, it uses many well-established methods of
+            supervised learning, such as deep neural networks for function approximation,
+            stochastic gradient descent, and backpropagation, to learn data representation. On the
+            other hand, it usually applies them in a different way.
+            <cite>Lapan, <i>Deep Reinforcement Learning Hands-on</i>, cap. 1</cite>
+          </blockquote>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 ============ -->
+    <section id="laco">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 03 · O laço agente–ambiente">
+          <div class="sec-head">
+            <span class="n">§ 03</span>
+            <h2>O laço, com notação</h2>
+            <span class="sub">Tudo em RL acontece dentro desta sequência</span>
+          </div>
+          <div class="eq">
+            <span class="op-amb"><span class="v">S</span><sub>0</sub></span>,
+            <span class="op-age"><span class="v">A</span><sub>0</sub></span>,
+            <span class="op-rec"><span class="v">R</span><sub>1</sub></span>,
+            <span class="op-amb"><span class="v">S</span><sub>1</sub></span>,
+            <span class="op-age"><span class="v">A</span><sub>1</sub></span>,
+            <span class="op-rec"><span class="v">R</span><sub>2</sub></span>,
+            <span class="op-amb"><span class="v">S</span><sub>2</sub></span>,
+            <span class="op-age"><span class="v">A</span><sub>2</sub></span>,
+            <span class="op-rec"><span class="v">R</span><sub>3</sub></span>, …
+            <small>tempo discreto, <span class="v">t</span> = 0, 1, 2, … · a sequência é a <strong>trajetória</strong></small>
+          </div>
+          <div class="defn amb">
+            <span class="lab">Convenção de índices — não escorregue aqui</span>
+            <p>A recompensa que <strong>resulta</strong> de <span class="v">A</span><sub>t</sub>
+            é <span class="v">R</span><sub>t+1</sub>, e não <span class="v">R</span><sub>t</sub>.</p>
+          </div>
+          <details class="mais">
+            <summary>Por que t+1?</summary>
+            <div class="corpo">
+              <p>O índice marca <i>quando o número chegou ao agente</i>, junto com
+              <span class="v">S</span><sub>t+1</sub> — ambos vêm do ambiente no mesmo instante.
+              Parte da literatura mais antiga usa <span class="v">R</span><sub>t</sub>; nós
+              seguimos o Sutton &amp; Barto (2018).</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="slide" data-sec="§ 03 · O laço agente–ambiente">
+          <h3>Os três conjuntos</h3>
+          <ul>
+            <li><span class="op-amb"><span class="v">S</span><sub>t</sub> ∈ 𝒮</span> — os estados possíveis.</li>
+            <li><span class="op-age"><span class="v">A</span><sub>t</sub> ∈ 𝒜(<span class="v">s</span>)</span>
+              — as ações disponíveis <strong>naquele</strong> estado.</li>
+            <li><span class="op-rec"><span class="v">R</span><sub>t</sub> ∈ ℝ</span> — um escalar.</li>
+          </ul>
+          <div class="note">
+            <span class="lab">Notação alternativa</span>
+            <p>Em controle: <span class="v">x</span> ≡ <span class="v">s</span> e
+            <span class="v">u</span> ≡ <span class="v">a</span>. Usamos
+            <span class="v">s</span>, <span class="v">a</span>, <span class="v">r</span> para ficar
+            colado ao livro-texto.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 03 · O laço agente–ambiente">
+          <h3>Onde fica a fronteira entre agente e ambiente?</h3>
+          <div class="defn amb">
+            <span class="lab">A regra</span>
+            <p>Tudo o que o agente <strong>não controla arbitrariamente</strong> faz parte do
+            ambiente. Não é a fronteira física.</p>
+          </div>
+          <ul>
+            <li>Motores, bateria e o corpo do robô: <strong>ambiente</strong>.</li>
+            <li>O agente é apenas o <strong>processo de decisão</strong>.</li>
+          </ul>
+          <div class="note problema">
+            <span class="lab">Corolário incômodo</span>
+            <p>Conhecer a dinâmica ≠ saber agir. Eu sei as regras do cubo mágico e continuo sem
+            saber resolvê-lo.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 03 · O laço agente–ambiente">
+          <h3>Veja o laço rodando</h3>
+          <div class="demo">
+            <div class="demo-head">
+              <span class="t">Um passo por vez</span>
+              <span class="h">7 salas; cada passo custa −1 e a saída vale +10</span>
+            </div>
+            <div class="demo-body">
+              <div class="ctl">
+                <button class="b primary" id="corPasso" type="button">Dar um passo</button>
+                <button class="b" id="corAuto" type="button">Automático</button>
+                <button class="b" id="corReset" type="button">Reiniciar</button>
+                <div class="seg" id="corPol">
+                  <button type="button" data-k="rand" aria-pressed="true">Ações ao acaso</button>
+                  <button type="button" data-k="dir" aria-pressed="false">Sempre à direita</button>
+                </div>
+              </div>
+              <canvas class="plot curto" id="corCanvas" aria-label="Corredor de sete salas com o agente em uma delas e a saída premiada na extremidade direita"></canvas>
+              <div class="readout">
+                <div><span class="k">passo <span class="v">t</span></span><span class="val" id="corT">0</span></div>
+                <div><span class="k">estado <span class="v">S</span><sub>t</sub></span><span class="val amb" id="corS">3</span></div>
+                <div><span class="k">última <span class="v">R</span></span><span class="val rec" id="corR">—</span></div>
+                <div><span class="k">soma das recompensas</span><span class="val rec" id="corAcc">0</span></div>
+                <div><span class="k">episódios</span><span class="val age" id="corEp">0</span></div>
+              </div>
+              <div class="traj" id="corTraj"><span class="t0">a trajetória aparece aqui</span></div>
+            </div>
+          </div>
+          <div class="note">
+            <span class="lab">O que observar</span>
+            <p>O agente que anda ao acaso não é "menos inteligente" — ele apenas ainda não tem
+            <strong>nenhuma estimativa de valor</strong> para se guiar.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 04 ============ -->
+    <section id="politica">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 04 · Política e hipótese da recompensa">
+          <div class="sec-head">
+            <span class="n">§ 04</span>
+            <h2>A política é o objeto que procuramos</h2>
+            <span class="sub">Aprender = melhorar o mapa que leva situações em ações</span>
+          </div>
+          <div class="eq">
+            <span class="op-age">π</span>(<span class="v">s</span>) = <span class="v">a</span>
+            <small><strong>determinística</strong>: cada estado tem uma resposta só</small>
+          </div>
+          <div class="eq">
+            <span class="op-age">π</span>(<span class="v">a</span> | <span class="v">s</span>) =
+            Pr{ <span class="v">A</span><sub>t</sub> = <span class="v">a</span> |
+            <span class="v">S</span><sub>t</sub> = <span class="v">s</span> }
+            <small><strong>estocástica</strong>: uma distribuição sobre as ações</small>
+          </div>
+          <ul>
+            <li>Tabela, regra, rede neural — qualquer coisa que responda "o que eu faço aqui?".</li>
+            <li>A estocástica é a forma <strong>geral</strong>; a determinística é caso particular.</li>
+          </ul>
+        </div>
+
+        <div class="slide" data-sec="§ 04 · Política e hipótese da recompensa">
+          <h3>Toda a definição de objetivo cabe num escalar?</h3>
+          <div class="defn rec">
+            <span class="lab">Hipótese da recompensa</span>
+            <p>Todo objetivo pode ser bem representado como a <strong>maximização do valor esperado
+            da soma acumulada</strong> de um sinal escalar de recompensa.</p>
+          </div>
+          <ul>
+            <li>É uma <strong>hipótese</strong>, não um teorema.</li>
+            <li>Aceitá-la é o que define o campo.</li>
+            <li>É a primeira coisa a questionar quando um projeto de RL dá errado.</li>
+          </ul>
+        </div>
+
+        <div class="slide" data-sec="§ 04 · Política e hipótese da recompensa">
+          <div class="note problema">
+            <span class="lab">Erro clássico de projeto</span>
+            <p>A recompensa diz <strong>o que</strong> você quer, nunca <strong>como</strong> conseguir.</p>
+          </div>
+          <ul>
+            <li>Premiar "encostar no lixo" → robô que esbarra no mesmo detrito.</li>
+            <li>Premiar capturar peças → agente de xadrez guloso que perde a partida.</li>
+          </ul>
+          <p>Conhecimento sobre <i>como</i> agir entra pela política ou pelo valor inicial —
+          <strong>não</strong> pela recompensa.</p>
+          <details class="mais">
+            <summary>A recompensa é aleatória, no caso geral</summary>
+            <div class="corpo">
+              <p>Escrever <span class="v">r</span>(<span class="v">s</span>,<span class="v">a</span>)
+              como função determinística é um caso particular. No caso geral o ambiente sorteia
+              <span class="v">R</span><sub>t+1</sub> e <span class="v">S</span><sub>t+1</sub> a
+              partir de <span class="v">S</span><sub>t</sub> e <span class="v">A</span><sub>t</sub>.
+              A aula 03 formaliza isso como
+              <span class="v">p</span>(<span class="v">s′</span>,<span class="v">r</span> |
+              <span class="v">s</span>,<span class="v">a</span>).</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 05 ============ -->
+    <section id="valor">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 05 · Recompensa não é valor">
+          <div class="sec-head">
+            <span class="n">§ 05</span>
+            <h2>Recompensa é imediata. Valor é a longo prazo.</h2>
+            <span class="sub">A distinção mais importante da aula</span>
+          </div>
+          <p>Maximizamos não <span class="v">R</span><sub>t+1</sub>, mas o <strong>retorno</strong>:</p>
+          <div class="eq">
+            <span class="v">G</span><sub>t</sub> =
+            <span class="op-rec"><span class="v">R</span><sub>t+1</sub></span> +
+            γ <span class="op-rec"><span class="v">R</span><sub>t+2</sub></span> +
+            γ² <span class="op-rec"><span class="v">R</span><sub>t+3</sub></span> + … =
+            <span class="sum">∑</span><sub style="font-size:.7em">k=0</sub><sup style="font-size:.7em">∞</sup>
+            γ<sup><span class="v">k</span></sup>
+            <span class="op-rec"><span class="v">R</span><sub>t+k+1</sub></span>
+            <small>desconto 0 ≤ γ ≤ 1</small>
+          </div>
+          <ul>
+            <li>γ = 0 → <strong>míope</strong>: só o próximo passo.</li>
+            <li>γ → 1 → <strong>previdente</strong>: o distante pesa quase como o imediato.</li>
+            <li>γ &lt; 1 garante que a soma <strong>converge</strong> em tarefas sem fim.</li>
+          </ul>
+          <details class="mais">
+            <summary>Tarefa episódica × contínua</summary>
+            <div class="corpo">
+              <p>Se a interação se quebra em <strong>episódios</strong> (uma partida, uma tentativa
+              de pouso), a soma é finita e γ = 1 é permitido. Se a tarefa é <strong>contínua</strong>
+              (controlar uma planta para sempre), γ &lt; 1 é necessário para que
+              <span class="v">G</span><sub>t</sub> seja um número.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="slide" data-sec="§ 05 · Recompensa não é valor">
+          <h3>As funções de valor</h3>
+          <div class="defn rec">
+            <span class="lab">Valor do estado</span>
+            <p><span class="v">v</span><sub>π</sub>(<span class="v">s</span>) = 𝔼<sub>π</sub>[
+            <span class="v">G</span><sub>t</sub> | <span class="v">S</span><sub>t</sub> =
+            <span class="v">s</span> ] — retorno esperado a partir de <span class="v">s</span>,
+            seguindo π.</p>
+          </div>
+          <div class="defn rec">
+            <span class="lab">Valor da ação</span>
+            <p><span class="v">q</span><sub>π</sub>(<span class="v">s</span>,<span class="v">a</span>)
+            = 𝔼<sub>π</sub>[ <span class="v">G</span><sub>t</sub> |
+            <span class="v">S</span><sub>t</sub> = <span class="v">s</span>,
+            <span class="v">A</span><sub>t</sub> = <span class="v">a</span> ] — o mesmo, fixando a
+            primeira ação.</p>
+          </div>
+          <div class="eq">
+            <span class="op-age">π</span>(<span class="v">s</span>) =
+            arg max<sub style="font-size:.72em"><span class="v">a</span></sub>
+            <span class="v">q</span>(<span class="v">s</span>, <span class="v">a</span>)
+            <small>com <span class="v">q</span> em mãos, agir bem vira consulta a uma tabela</small>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 05 · Recompensa não é valor">
+          <h3>Não embaralhe os dois</h3>
+          <div class="tbl-scroll">
+            <table class="tri">
+              <thead>
+                <tr><th></th><th>vem de</th><th>horizonte</th><th>é aprendido?</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="q">r, R</td><td><strong>ambiente</strong></td><td>imediato</td><td>não</td></tr>
+                <tr><td class="q">v, q</td><td><strong>agente</strong> (estima)</td><td>futuro esperado</td><td><strong>sim</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="note problema">
+            <span class="lab">Sintoma de confusão</span>
+            <p>Escrever <span class="v">v</span>(<span class="v">s</span>,<span class="v">a</span>):
+            <span class="v">v</span> é do <strong>estado</strong>,
+            <span class="v">q</span> é do <strong>par</strong>.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 05 · Recompensa não é valor">
+          <blockquote>
+            Rewards are in a sense primary, whereas values, as predictions of rewards, are secondary.
+            Without rewards there could be no values, and the only purpose of estimating values is to
+            achieve more reward. Nevertheless, it is values with which we are most concerned when
+            making and evaluating decisions.
+            <cite>Sutton &amp; Barto, § 1.3</cite>
+          </blockquote>
+        </div>
+
+        <div class="slide" data-sec="§ 05 · Recompensa não é valor">
+          <h3>Uma escolha em que a recompensa mente</h3>
+          <div class="demo">
+            <div class="demo-head">
+              <span class="t">Guloso pela recompensa × guloso pelo valor</span>
+              <span class="h">a esquerda paga já; a direita paga melhor, depois</span>
+            </div>
+            <div class="demo-body">
+              <div class="sliders">
+                <div class="sld">
+                  <label for="gamSld">desconto γ</label>
+                  <input type="range" id="gamSld" min="0" max="0.99" step="0.01" value="0.9">
+                  <output id="gamOut">0,90</output>
+                </div>
+                <div class="sld">
+                  <label for="gamN">passos até o prêmio grande</label>
+                  <input type="range" id="gamN" min="1" max="6" step="1" value="3">
+                  <output id="gamNOut">3</output>
+                </div>
+                <div class="sld">
+                  <label for="gamBig">tamanho do prêmio grande</label>
+                  <input type="range" id="gamBig" min="2" max="20" step="1" value="10">
+                  <output id="gamBigOut">10</output>
+                </div>
+              </div>
+              <canvas class="plot curto" id="gamCanvas" aria-label="Corredor com o agente no meio: um passo à esquerda dá recompensa mais um e termina; alguns passos à direita levam a uma recompensa maior"></canvas>
+              <div class="bar-wrap">
+                <div class="bar-row" id="gamRowL">
+                  <span>ir para a esquerda</span>
+                  <span class="bar"><i id="gamBarL"></i></span>
+                  <span class="num" id="gamNumL">1,00</span>
+                </div>
+                <div class="bar-row" id="gamRowR">
+                  <span>ir para a direita</span>
+                  <span class="bar"><i id="gamBarR"></i></span>
+                  <span class="num" id="gamNumR">8,10</span>
+                </div>
+              </div>
+              <div class="eq" style="font-size:1.05rem;margin:.9rem 0 0" id="gamEq"></div>
+              <div class="verdict ok" id="gamMsg"></div>
+            </div>
+          </div>
+          <p>A recompensa imediata da esquerda é maior — <strong>sempre</strong>. Quem decide pelo
+          <strong>valor</strong> muda de ideia dependendo de γ.</p>
+        </div>
+
+        <div class="slide" data-sec="§ 05 · Recompensa não é valor">
+          <div class="ex" data-ex>
+            <span class="lab">Exercício 1 · o ponto de virada</span>
+            <p>
+              Prêmio grande = 10, a 3 passos, recompensa 0 no caminho. Em que γ as duas opções
+              empatam? E se o prêmio estiver mais longe?
+            </p>
+            <button class="b" type="button" data-reveal>Mostrar resolução</button>
+            <div class="sol" hidden>
+              <p>Esquerda: <span class="v">G</span> = 1. Direita: <span class="v">G</span> = γ²·10.</p>
+              <p>Empate: γ²·10 = 1 ⟹ γ = 1/√10 ≈ <span class="res">0,316</span>.</p>
+              <p>Com o prêmio a <span class="v">n</span> passos, o empate ocorre em
+              γ = 10<sup>−1/(<span class="v">n</span>−1)</sup>: quanto mais longe,
+              <strong>mais perto de 1</strong> γ precisa estar.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 06 ============ -->
+    <section id="exploracao">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 06 · Exploração × explotação">
+          <div class="sec-head">
+            <span class="n">§ 06</span>
+            <h2>O dilema que só existe em RL</h2>
+            <span class="sub">Repetir o que funcionou × testar o que nunca se fez</span>
+          </div>
+          <div class="cols2">
+            <div class="defn">
+              <span class="lab">Explotação</span>
+              <p>A ação de maior estimativa de valor. Maximiza a recompensa <strong>agora</strong>.</p>
+            </div>
+            <div class="defn amb">
+              <span class="lab">Exploração</span>
+              <p>Outra ação, para <strong>melhorar as estimativas</strong>. Custa agora, paga depois.</p>
+            </div>
+          </div>
+          <ul>
+            <li>Feedback avaliativo: a única forma de saber o valor de uma ação é <strong>executá-la</strong>.</li>
+            <li>Ambiente ruidoso: uma tentativa não basta, é preciso <strong>repetição</strong>.</li>
+          </ul>
+        </div>
+
+        <div class="slide" data-sec="§ 06 · Exploração × explotação">
+          <div class="note problema">
+            <span class="lab">Por que isso não aparece em aprendizado supervisionado</span>
+            <p>Lá o rótulo correto vem de graça para <strong>toda</strong> entrada, inclusive para
+            as decisões que o modelo não tomou.</p>
+            <p>Aqui, quem não experimenta não fica sabendo — e pode passar a vida convencido de
+            que a <strong>segunda</strong> melhor ação é a melhor.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 06 · Exploração × explotação">
+          <h3>Quanto custa não explorar</h3>
+          <div class="demo">
+            <div class="demo-head">
+              <span class="t">Testbed de 10 braços</span>
+              <span class="h">média de 200 execuções · 1000 passos · curvas suavizadas</span>
+            </div>
+            <div class="demo-body">
+              <div class="ctl">
+                <button class="b primary" id="banRun" type="button">Rodar</button>
+                <div class="seg" id="banSeg">
+                  <button type="button" data-k="rec" aria-pressed="true">Recompensa média</button>
+                  <button type="button" data-k="opt" aria-pressed="false">% de ação ótima</button>
+                </div>
+              </div>
+              <div class="sliders">
+                <div class="sld">
+                  <label for="banEps">ε da quarta curva</label>
+                  <input type="range" id="banEps" min="0" max="0.5" step="0.01" value="0.30">
+                  <output id="banEpsOut">0,30</output>
+                </div>
+              </div>
+              <canvas class="plot" id="banCanvas" aria-label="Curvas de recompensa média por passo para diferentes valores de epsilon na política epsilon-gulosa"></canvas>
+              <div class="readout">
+                <div><span class="k">ε = 0 (guloso)</span><span class="val" id="banV0">—</span></div>
+                <div><span class="k">ε = 0,01</span><span class="val amb" id="banV1">—</span></div>
+                <div><span class="k">ε = 0,1</span><span class="val rec" id="banV2">—</span></div>
+                <div><span class="k">ε ajustável</span><span class="val age" id="banV3">—</span></div>
+              </div>
+              <div class="verdict rec" id="banMsg">Clique em “Rodar”. Os números da leitura são a média dos últimos 100 passos.</div>
+            </div>
+          </div>
+          <details class="mais">
+            <summary>A montagem do experimento</summary>
+            <div class="corpo">
+              <p>Dez ações, cada uma com um valor verdadeiro
+              <span class="v">q</span><sub>*</sub>(<span class="v">a</span>) ~ N(0,1) desconhecido;
+              a recompensa recebida é ruidosa. A política ε-gulosa explora com probabilidade ε.
+              É, essencialmente, a Figura 2.2 do Sutton &amp; Barto — e o assunto inteiro da
+              <strong>aula 02</strong>.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="slide" data-sec="§ 06 · Exploração × explotação">
+          <h3>O que a figura ensina</h3>
+          <ul>
+            <li><strong>ε = 0</strong> sobe rápido e <strong>estaciona</strong>: trava na primeira
+              ação que pareceu boa.</li>
+            <li><strong>ε = 0,1</strong> aprende rápido, mas paga pedágio para sempre — explora 10%
+              das vezes mesmo já sabendo a resposta.</li>
+            <li><strong>ε = 0,01</strong> demora e, no longo prazo, passa à frente.</li>
+          </ul>
+          <div class="defn rec">
+            <span class="lab">A conclusão</span>
+            <p>Não existe ε ótimo universal. Existe ε adequado ao <strong>horizonte</strong>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 07 ============ -->
+    <section id="elementos">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 07 · Os elementos do RL">
+          <div class="sec-head">
+            <span class="n">§ 07</span>
+            <h2>Quatro elementos — e um deles é opcional</h2>
+            <span class="sub">Além do agente e do ambiente</span>
+          </div>
+          <div class="defn">
+            <span class="lab">1 · Política</span>
+            <p>Como o agente se comporta: mapa dos estados percebidos para as ações. É o núcleo
+            do agente.</p>
+          </div>
+          <div class="defn rec">
+            <span class="lab">2 · Sinal de recompensa</span>
+            <p>Define o <strong>objetivo</strong>. O agente não pode alterá-lo — só pode mudar as
+            ações e, por meio delas, os números que recebe.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 07 · Os elementos do RL">
+          <div class="defn rec">
+            <span class="lab">3 · Função de valor</span>
+            <p>O que é bom <strong>a longo prazo</strong>: quanto de recompensa se pode esperar
+            acumular a partir dali.</p>
+          </div>
+          <div class="defn amb">
+            <span class="lab">4 · Modelo do ambiente <i>(opcional)</i></span>
+            <p>Imita o ambiente e permite <strong>inferir</strong> a reação antes de agir. Com
+            modelo dá para <strong>planejar</strong>; sem modelo, resta tentativa e erro.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 07 · Os elementos do RL">
+          <h3>Com modelo ou sem modelo</h3>
+          <div class="tbl-scroll">
+            <table class="tri">
+              <thead>
+                <tr><th></th><th><i>Model-free</i></th><th><i>Model-based</i></th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Como decide</strong></td><td>tentativa e erro, pela experiência</td><td>simula à frente e escolhe</td></tr>
+                <tr><td><strong>Precisa de</strong></td><td>muitas interações reais</td><td>um modelo, dado ou aprendido</td></tr>
+                <tr><td><strong>Risco</strong></td><td>caro no mundo físico</td><td>o modelo estar errado</td></tr>
+                <tr><td><strong>Exemplos</strong></td><td>Q-learning, SARSA, DQN, PPO</td><td>prog. dinâmica, Dyna, MCTS</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <details class="mais">
+            <summary>Modelo detalhado × <i>cheap simulation</i></summary>
+            <div class="corpo">
+              <p>Um modelo grosseiro e barato, rodado milhões de vezes, costuma valer mais do que
+              um modelo fiel e caro — é a aposta de simuladores como MuJoCo e Isaac: trocar
+              precisão por <strong>volume de experiência</strong>. O preço é o <i>reality gap</i>:
+              a política aprendida na simulação pode não sobreviver ao mundo real.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="slide" data-sec="§ 07 · Os elementos do RL">
+          <div class="note problema">
+            <span class="lab">Nem tudo que otimiza é RL</span>
+            <p>Métodos <strong>evolutivos</strong> geram políticas inteiras, medem o desempenho de
+            cada uma e mantêm as melhores.</p>
+          </div>
+          <ul>
+            <li>Não usam <strong>quais estados</strong> foram visitados.</li>
+            <li>Não usam <strong>quais ações</strong> foram escolhidas dentro da partida.</li>
+            <li>Jogam fora exatamente a informação que as funções de valor aproveitam.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 08 ============ -->
+    <section id="velha">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <div class="sec-head">
+            <span class="n">§ 08</span>
+            <h2>Um exemplo completo: jogo da velha</h2>
+            <span class="sub">O § 1.5 do Sutton &amp; Barto, rodando ao vivo</span>
+          </div>
+          <ul>
+            <li>Oponente <strong>imperfeito</strong>, que às vezes erra.</li>
+            <li>Não queremos empatar sempre: queremos <strong>explorar as falhas dele</strong>.</li>
+            <li><strong>Minimax não serve</strong>: assume adversário perfeito e joga para o empate.</li>
+            <li><strong>Programação dinâmica</strong> serviria, mas exige o modelo do oponente.</li>
+          </ul>
+        </div>
+
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <h3>A montagem</h3>
+          <div class="defn amb">
+            <span class="lab">Estado e valores</span>
+            <ul>
+              <li><strong>Estado</strong>: o tabuleiro <i>depois</i> da nossa jogada (<i>afterstate</i>).</li>
+              <li><strong>Tabela</strong>: um <span class="v">V</span>(<span class="v">s</span>) por
+                estado — a probabilidade estimada de vencer.</li>
+              <li><strong>Terminais</strong>: 1 vitória · 0,5 empate · 0 derrota. Todo o resto começa em 0,5.</li>
+              <li><strong>Política</strong>: quase sempre gulosa; às vezes, uma jogada exploratória.</li>
+            </ul>
+          </div>
+          <details class="mais">
+            <summary>Por que 0,5 no empate, se o livro usa 0?</summary>
+            <div class="corpo">
+              <p>O livro trata empate como derrota: contra um adversário fraco, empatar é fracassar.
+              Aqui separamos os dois para que a demo continue tendo o que ensinar quando você subir
+              a perícia do oponente — contra jogo perfeito, empatar é o <i>melhor</i> resultado
+              possível, e com a codificação do livro o agente não distinguiria empate de derrota.</p>
+              <p>Repare: mudar um número na tabela de valores terminais <strong>muda o problema</strong>,
+              não o algoritmo.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <h3>A regra de aprendizado</h3>
+          <div class="eq">
+            <span class="v">V</span>(<span class="v">S</span><sub>t</sub>) ←
+            <span class="v">V</span>(<span class="v">S</span><sub>t</sub>) + α [
+            <span class="v">V</span>(<span class="v">S</span><sub>t+1</sub>) −
+            <span class="v">V</span>(<span class="v">S</span><sub>t</sub>) ]
+            <small><strong>diferenças temporais</strong>: puxe a estimativa de agora na direção
+            da estimativa seguinte</small>
+          </div>
+          <ul>
+            <li>A diferença entre colchetes é o <strong>erro de diferença temporal</strong>.</li>
+            <li>Não se espera o fim da partida: <strong>cada jogada corrige a anterior</strong>.</li>
+            <li>É o método da <strong>aula 05</strong>, apresentado aqui de graça.</li>
+          </ul>
+        </div>
+
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <h3>Treine o agente na sua frente</h3>
+          <div class="demo">
+            <div class="demo-head">
+              <span class="t">Jogo da velha por diferenças temporais</span>
+              <span class="h">o agente joga de X e começa</span>
+            </div>
+            <div class="demo-body">
+              <div class="ctl">
+                <button class="b primary" id="ttRun" type="button">Treinar</button>
+                <button class="b" id="ttReset" type="button">Zerar aprendizado</button>
+                <label class="inl"><input type="checkbox" id="ttExpUpd"> aprender também com jogadas exploratórias</label>
+              </div>
+              <div class="sliders">
+                <div class="sld">
+                  <label for="ttAlpha">taxa de aprendizado α</label>
+                  <input type="range" id="ttAlpha" min="0.01" max="0.5" step="0.01" value="0.1">
+                  <output id="ttAlphaOut">0,10</output>
+                </div>
+                <div class="sld">
+                  <label for="ttEps">exploração ε</label>
+                  <input type="range" id="ttEps" min="0" max="0.5" step="0.01" value="0.1">
+                  <output id="ttEpsOut">0,10</output>
+                </div>
+                <div class="sld">
+                  <label for="ttOpp">perícia do oponente</label>
+                  <input type="range" id="ttOpp" min="0" max="1" step="0.05" value="0.5">
+                  <output id="ttOppOut">50%</output>
+                </div>
+              </div>
+              <canvas class="plot" id="ttCanvas" aria-label="Curva da taxa de vitórias do agente ao longo dos episódios de treino"></canvas>
+              <div class="readout">
+                <div><span class="k">partidas</span><span class="val" id="ttEp">0</span></div>
+                <div><span class="k">vitórias (últimas 500)</span><span class="val rec" id="ttWin">—</span></div>
+                <div><span class="k">derrotas</span><span class="val ale" id="ttLoss">—</span></div>
+                <div><span class="k">estados visitados</span><span class="val amb" id="ttStates">0</span></div>
+              </div>
+            </div>
+          </div>
+          <p style="font-family:var(--sans);font-size:.85rem;color:var(--ink-mute);margin:0">
+            A perícia é a probabilidade de o oponente jogar de forma ótima (minimax); no resto das
+            vezes ele joga ao acaso.
+          </p>
+        </div>
+
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <h3>O que ele descobriu sozinho</h3>
+          <div class="board-wrap">
+            <div class="board" id="ttBoard" aria-label="Valor aprendido para cada primeira jogada possível"></div>
+            <div>
+              <ul>
+                <li>Cada célula é <span class="v">V</span> do tabuleiro com o primeiro X ali.</li>
+                <li>Nenhuma dica sobre centro, quinas ou laterais foi dada.</li>
+                <li>Células paradas em <strong>0,50</strong>: nunca experimentadas.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <h3>Experimentos para fazer em aula</h3>
+          <ul>
+            <li><strong>ε = 0</strong> — a taxa de vitória até sobe, mas <strong>oito das nove
+              aberturas ficam em 0,50</strong>. Ele joga bem uma linha só.</li>
+            <li><strong>Aprender com exploratórias</strong> — as derrotas sobem: passa a estimar o
+              valor de uma política que inclui as jogadas aleatórias.</li>
+            <li><strong>Perícia 100%</strong> — vitórias vão a zero, empates dominam, e todas as
+              aberturas convergem para 0,50.</li>
+          </ul>
+          <details class="mais">
+            <summary>Por que cada um desses efeitos acontece</summary>
+            <div class="corpo">
+              <p><strong>ε = 0:</strong> some o pedágio das jogadas aleatórias, mas o agente nunca
+              descobre o que não tentou. É a ignorância que a exploração compra.</p>
+              <p><strong>Exploratórias:</strong> o agente passa a estimar o valor da política que
+              ele <i>executa</i>, e não da política gulosa que pretende seguir. É a distinção
+              <i>on-policy</i> × <i>off-policy</i>, que volta na aula 05.</p>
+              <p><strong>Perícia 100%:</strong> contra jogo perfeito, empatar é o melhor resultado
+              possível — e todas as aberturas empatam, por isso valem 0,50.</p>
+            </div>
+          </details>
+        </div>
+
+        <div class="slide" data-sec="§ 08 · Exemplo: jogo da velha">
+          <h3>O que este exemplo pequeno já contém</h3>
+          <div class="duo-lista">
+            <ul>
+              <li><strong>Interação</strong>: aprende jogando.</li>
+              <li><strong>Objetivo claro</strong>: vencer.</li>
+              <li><strong>Consequências atrasadas</strong>.</li>
+            </ul>
+            <ul>
+              <li><strong>Sem modelo</strong> do oponente.</li>
+              <li><strong>Melhora enquanto joga</strong>: sem fase de treino separada.</li>
+            </ul>
+          </div>
+          <div class="note problema">
+            <span class="lab">E o que ele esconde</span>
+            <p>São 3<sup>9</sup> = 19 683 configurações — cabem numa tabela. O gamão tem
+            10<sup>20</sup>; o Go, 10<sup>170</sup>. A partir da <strong>aula 08</strong> a função
+            de valor precisa virar <strong>função aproximada</strong>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 09 ============ -->
+    <section id="limites">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 09 · Limites e dificuldades">
+          <div class="sec-head">
+            <span class="n">§ 09</span>
+            <h2>O que torna isto difícil</h2>
+            <span class="sub">Cada item aqui vira uma aula mais adiante</span>
+          </div>
+          <div class="defn amb">
+            <span class="lab">Estado ≠ observação</span>
+            <p>A teoria supõe que <span class="v">S</span><sub>t</sub> resume o passado
+            (<strong>propriedade de Markov</strong>). Na prática chega uma observação parcial.</p>
+          </div>
+          <div class="defn">
+            <span class="lab">Atribuição de crédito</span>
+            <p>A recompensa chega tarde e sem etiqueta: qual das 200 ações foi a responsável?</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 09 · Limites e dificuldades">
+          <div class="defn rec">
+            <span class="lab">Fome de dados</span>
+            <p>Dezenas de milhões de quadros para um Atari que um humano entende em minutos. No
+            mundo físico, cada amostra custa tempo e desgaste.</p>
+          </div>
+          <div class="defn">
+            <span class="lab">Dimensionalidade</span>
+            <p>Tabelas acabam. Com aproximação ganhamos generalização e perdemos as garantias de
+            convergência do caso tabular.</p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 09 · Limites e dificuldades">
+          <div class="note problema">
+            <span class="lab">E o problema mais humano de todos</span>
+            <p><strong>Especificar a recompensa.</strong> O agente otimiza exatamente o que você
+            escreveu — inclusive os atalhos que você não previu.</p>
+          </div>
+          <ul>
+            <li>Premiado por "andar para a frente" → aprende a <strong>cair</strong> para a frente.</li>
+            <li>Premiado por pontuação num jogo de barco → gira em círculo coletando itens e nunca
+              termina a corrida.</li>
+          </ul>
+          <p>O fenômeno tem nome: <i>reward hacking</i>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section id="historia">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 10 · Três fios da história">
+          <div class="sec-head">
+            <span class="n">§ 10</span>
+            <h2>Três fios que se encontraram nos anos 1980</h2>
+            <span class="sub">Por que a notação parece meio psicologia, meio teoria de controle</span>
+          </div>
+          <div class="cols2">
+            <div class="defn">
+              <span class="lab">1 · tentativa e erro</span>
+              <p>Psicologia animal. <strong>Lei do efeito</strong> (Thorndike, 1911); Minsky
+              (SNARC, 1951); Klopf (1972).</p>
+            </div>
+            <div class="defn amb">
+              <span class="lab">2 · controle ótimo</span>
+              <p>Bellman (1957): <strong>programação dinâmica</strong> e MDPs. Howard (1960):
+              iteração de política. Daqui vêm <span class="v">v</span> e <span class="v">q</span>.</p>
+            </div>
+            <div class="defn rec">
+              <span class="lab">3 · diferenças temporais</span>
+              <p>Aprender de uma previsão para a próxima. Samuel (1959) nas damas; Sutton (1988)
+              formaliza o TD.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 10 · Três fios da história">
+          <div class="defn">
+            <span class="lab">O nó, em 1989</span>
+            <p>Watkins amarra os fios 2 e 3 com o <strong>Q-learning</strong>: controle ótimo
+            aprendido por diferenças temporais, <strong>sem modelo</strong>. É o algoritmo que a
+            maior parte desta disciplina persegue.</p>
+          </div>
+          <h3>Marcos</h3>
+          <div class="tl">
+            <div class="it"><b>1992</b> <strong>TD-Gammon</strong>: rede rasa + TD + autojogo
+              chegam ao nível de campeão mundial de gamão.</div>
+            <div class="it"><b>2015</b> <strong>DQN</strong> (<i>Nature</i>): a mesma rede aprende
+              49 jogos de Atari a partir dos pixels.</div>
+            <div class="it"><b>2016</b> <strong>AlphaGo</strong> vence Lee Sedol; em 2017,
+              AlphaZero dispensa as partidas humanas.</div>
+            <div class="it"><b>2022</b> <strong>RLHF</strong>: modelos de linguagem alinhados por
+              preferências humanas.</div>
+            <div class="it"><b>hoje</b> plasma em tokamaks, refrigeração de datacenters, robótica
+              <i>sim-to-real</i>, ajuste de compiladores.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 ============ -->
+    <section id="sintese">
+      <div class="wrap">
+        <div class="slide" data-sec="§ 11 · Síntese">
+          <div class="sec-head">
+            <span class="n">§ 11</span>
+            <h2>Síntese</h2>
+            <span class="sub">O vocabulário que vale para a disciplina inteira</span>
+          </div>
+          <div class="tbl-scroll">
+            <table class="tri">
+              <thead>
+                <tr><th>Símbolo</th><th>Nome</th><th>Quem produz</th><th>O que é</th></tr>
+              </thead>
+              <tbody>
+                <tr><td class="q">S<sub>t</sub> ∈ 𝒮</td><td>estado</td><td>ambiente</td><td>o que o agente sabe em <span class="v">t</span></td></tr>
+                <tr><td class="q">A<sub>t</sub> ∈ 𝒜(s)</td><td>ação</td><td><strong>agente</strong></td><td>o que o agente controla</td></tr>
+                <tr><td class="q">R<sub>t+1</sub> ∈ ℝ</td><td>recompensa</td><td>ambiente</td><td>avaliação imediata</td></tr>
+                <tr><td class="q">G<sub>t</sub></td><td>retorno</td><td>—</td><td>soma descontada do futuro</td></tr>
+                <tr><td class="q">π(a|s)</td><td>política</td><td>agente</td><td>como escolher a ação</td></tr>
+                <tr><td class="q">v<sub>π</sub>(s)</td><td>valor do estado</td><td>agente (estima)</td><td>retorno esperado de <span class="v">s</span></td></tr>
+                <tr><td class="q">q<sub>π</sub>(s,a)</td><td>valor da ação</td><td>agente (estima)</td><td>o mesmo, fixando a ação</td></tr>
+                <tr><td class="q">γ ∈ [0,1]</td><td>desconto</td><td>projetista</td><td>quanto o futuro pesa</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 11 · Síntese">
+          <h3>O que levar da aula</h3>
+          <ul>
+            <li>RL é aprendizado <strong>orientado a objetivo a partir da interação</strong>, com
+              feedback <strong>avaliativo</strong> — não instrutivo.</li>
+            <li><strong>Recompensa ≠ valor.</strong> A recompensa vem do ambiente; o valor é uma
+              previsão do agente — e é sobre ela que se decide.</li>
+            <li>Exploração e explotação estão em conflito permanente, e o conflito é
+              <strong>quantificável</strong>.</li>
+            <li>O tempo e as <strong>consequências atrasadas</strong> são da natureza do problema.</li>
+          </ul>
+        </div>
+
+        <div class="slide" data-sec="§ 11 · Atividades">
+          <h3>Atividades</h3>
+          <div class="ex" data-ex>
+            <span class="lab">Atividade 1 · preparação de ambiente</span>
+            <p>
+              Instale o <a href="https://gymnasium.farama.org/">Gymnasium</a> e rode as seções
+              "Basic Usage" e "Training an Agent". Roteiro pronto em
+              <code>scripts/gymnasium_primeiro_contato.py</code>.
+            </p>
+            <button class="b" type="button" data-reveal>O que responder</button>
+            <div class="sol" hidden>
+              <p>Para o ambiente escolhido: o que é 𝒮, o que é 𝒜, qual é o sinal de recompensa,
+              o que encerra um episódio, e se a tarefa é episódica ou contínua. Traga a saída
+              do script.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 11 · Atividades">
+          <div class="ex" data-ex>
+            <span class="lab">Atividade 2 · a fronteira e a recompensa</span>
+            <p>
+              Escolha um problema da sua área e descreva: (a) onde fica a fronteira
+              agente–ambiente; (b) o sinal de recompensa; (c) uma forma de o agente
+              <strong>maximizar a recompensa sem resolver o problema</strong>.
+            </p>
+          </div>
+          <div class="ex" data-ex>
+            <span class="lab">Atividade 3 · explore as ferramentas</span>
+            <p>
+              Levante alternativas ao Gymnasium e diga para que servem:
+              <a href="https://www.mathworks.com/products/reinforcement-learning.html">RL Toolbox</a> (MATLAB),
+              <a href="https://genesis-world.readthedocs.io/en/latest/">Genesis</a> e
+              <a href="https://developer.nvidia.com/isaac/lab">NVIDIA Isaac Lab</a>.
+            </p>
+          </div>
+        </div>
+
+        <div class="slide" data-sec="§ 11 · Atividades">
+          <div class="note">
+            <span class="lab">Próxima aula</span>
+            <p>Apagamos o estado do problema e ficamos só com o dilema do § 06: o
+            <strong><i>multi-armed bandit</i></strong>.</p>
+            <p>Um único estado, várias ações, e todo o arsenal para equilibrar exploração e
+            explotação — médias amostrais, ε-guloso, valores iniciais otimistas, UCB.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="hud" id="hud">
+  <span class="bar" id="hudBar"></span>
+  <span class="where" id="hudWhere"></span>
+  <span class="count" id="hudCount"></span>
+  <span class="sep"></span>
+  <button type="button" id="hudZoomOut" aria-label="Diminuir fonte">A−</button>
+  <span class="zoom" id="hudZoom">100%</span>
+  <button type="button" id="hudZoomIn" aria-label="Aumentar fonte">A+</button>
+  <span class="sep"></span>
+  <button type="button" id="hudPrev" aria-label="Slide anterior">←</button>
+  <button type="button" id="hudNext" aria-label="Próximo slide">→</button>
+  <button type="button" id="hudExit">Sair</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var root = document.documentElement;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var TAU = Math.PI * 2;
+
+  function css(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+  function $(id) { return document.getElementById(id); }
+  function num(x, d) { return x.toFixed(d === undefined ? 2 : d).replace(".", ","); }
+  function fam(varname) { return (css(varname).split(",")[0] || "sans-serif").replace(/"/g, ""); }
+
+  function wireSeg(id, cb) {
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener("click", function (ev) {
+      var b = ev.target.closest("button[data-k]");
+      if (!b) return;
+      Array.prototype.forEach.call(el.querySelectorAll("button[data-k]"), function (x) {
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      cb(b.getAttribute("data-k"));
+    });
+  }
+
+  function wireSld(id, outId, fmt, cb) {
+    var el = $(id), out = $(outId);
+    function upd() { out.textContent = fmt(parseFloat(el.value)); cb(parseFloat(el.value)); }
+    el.addEventListener("input", upd);
+    upd();
+  }
+
+  /* Devolve null quando o canvas não tem caixa de layout (slide oculto).
+     Sem isso o buffer encolheria para 1px e o CSS o esticaria depois,
+     virando um bloco sólido — acontece, por exemplo, quando a resolução
+     muda ao plugar o projetor no meio da apresentação. */
+  function fit(canvas) {
+    var r = canvas.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return null;
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    var ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, r.width, r.height);
+    return { ctx: ctx, w: r.width, h: r.height };
+  }
+
+  /* rótulo com índice em corpo menor: "ação A" + "t" */
+  function rotulo(ctx, x, y, texto, simbolo, indice, cor) {
+    var F = fam("--sans");
+    ctx.save();
+    ctx.textBaseline = "middle"; ctx.textAlign = "left";
+    ctx.font = "12px " + F;          var w1 = ctx.measureText(texto).width;
+    ctx.font = "italic 13px " + F;   var w2 = ctx.measureText(simbolo).width;
+    ctx.font = "9px " + F;           var w3 = ctx.measureText(indice).width;
+    var x0 = x - (w1 + w2 + w3) / 2;
+    ctx.fillStyle = cor;
+    ctx.font = "12px " + F;          ctx.fillText(texto, x0, y);
+    ctx.font = "italic 13px " + F;   ctx.fillText(simbolo, x0 + w1, y);
+    ctx.font = "9px " + F;           ctx.fillText(indice, x0 + w1 + w2, y + 4);
+    ctx.restore();
+  }
+
+  function seta(ctx, x, y, dx, dy, cor) {
+    var n = Math.hypot(dx, dy) || 1;
+    dx /= n; dy /= n;
+    ctx.save(); ctx.fillStyle = cor;
+    ctx.beginPath();
+    ctx.moveTo(x + dx * 7, y + dy * 7);
+    ctx.lineTo(x - dy * 4.5 - dx * 3, y + dx * 4.5 - dy * 3);
+    ctx.lineTo(x + dy * 4.5 - dx * 3, y - dx * 4.5 - dy * 3);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  /* moldura de gráfico: devolve conversores de dados para pixels */
+  function eixos(ctx, f, x0, x1, y0, y1, rotX, rotY) {
+    var L = 46, R = 10, T = 24, B = 34;
+    var w = f.w - L - R, h = f.h - T - B;
+    ctx.save();
+    ctx.strokeStyle = css("--rule"); ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(L, T); ctx.lineTo(L, T + h); ctx.lineTo(L + w, T + h);
+    ctx.stroke();
+    ctx.fillStyle = css("--ink-mute");
+    ctx.font = "10px " + fam("--mono");
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (var i = 0; i <= 4; i++) {
+      var vy = y0 + (y1 - y0) * i / 4, py = T + h - (h * i / 4);
+      ctx.fillText(num(vy, Math.abs(y1) >= 10 ? 0 : 1), L - 6, py);
+      if (i > 0) {
+        ctx.strokeStyle = css("--rule-soft");
+        ctx.beginPath(); ctx.moveTo(L, py); ctx.lineTo(L + w, py); ctx.stroke();
+      }
+    }
+    ctx.textBaseline = "top";
+    for (var j = 0; j <= 4; j++) {
+      var vx = x0 + (x1 - x0) * j / 4, px = L + w * j / 4;
+      ctx.textAlign = j === 0 ? "left" : (j === 4 ? "right" : "center");
+      ctx.fillText(String(Math.round(vx)), px, T + h + 6);
+    }
+    ctx.font = "10px " + fam("--sans");
+    ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillText(rotX, L + w, T + h + 20);
+    ctx.textAlign = "left"; ctx.fillText(rotY, 0, 4);
+    ctx.restore();
+    return {
+      x: function (v) { return L + w * (v - x0) / (x1 - x0); },
+      y: function (v) { return T + h - h * (v - y0) / (y1 - y0); },
+      L: L, T: T, w: w, h: h
+    };
+  }
+
+  /* ---------------- tema ---------------- */
+  var themeBtn = $("themeBtn");
+  var modes = ["auto", "light", "dark"];
+  var labels = { auto: "Tema: automático", light: "Tema: claro", dark: "Tema: escuro" };
+  var mi = 0;
+  themeBtn.addEventListener("click", function () {
+    mi = (mi + 1) % modes.length;
+    var m = modes[mi];
+    if (m === "auto") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", m);
+    themeBtn.textContent = labels[m];
+    redrawAll();
+  });
+
+  /* ---------------- capa: o laço ---------------- */
+  var heroCanvas = $("heroCanvas");
+  var fase = 0;
+
+  function pontoLaco(u, ax, bx, y, r) {
+    var span = bx - ax;
+    if (u < 0.5) { var t = u / 0.5; return [ax + span * t, y - r * Math.sin(Math.PI * t)]; }
+    var t2 = (u - 0.5) / 0.5; return [bx - span * t2, y + r * Math.sin(Math.PI * t2)];
+  }
+
+  function caixa(ctx, x, y, w, h, cor, titulo) {
+    ctx.save();
+    ctx.strokeStyle = cor; ctx.lineWidth = 1.4; ctx.fillStyle = css("--surface");
+    ctx.beginPath(); ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = cor; ctx.font = "600 13px " + fam("--sans");
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(titulo, x, y);
+    ctx.restore();
+  }
+
+  function drawHero() {
+    var f = fit(heroCanvas);
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, h = f.h, cy = h / 2;
+    var bw = Math.min(150, w * 0.26), bh = 46;
+    var ax = w / 2 - Math.min(190, w * 0.28);
+    var bx = w / 2 + Math.min(190, w * 0.28);
+    var r = Math.min(42, (h - bh) / 2 - 34);
+
+    ctx.save();
+    ctx.strokeStyle = css("--rule"); ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (var i = 0; i <= 240; i++) {
+      var p = pontoLaco(i / 240, ax, bx, cy, r);
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+    }
+    ctx.stroke(); ctx.restore();
+
+    var p1 = pontoLaco(0.25, ax, bx, cy, r), p1b = pontoLaco(0.27, ax, bx, cy, r);
+    seta(ctx, p1[0], p1[1], p1b[0] - p1[0], p1b[1] - p1[1], css("--agente"));
+    var p2 = pontoLaco(0.75, ax, bx, cy, r), p2b = pontoLaco(0.77, ax, bx, cy, r);
+    seta(ctx, p2[0], p2[1], p2b[0] - p2[0], p2b[1] - p2[1], css("--ambiente"));
+
+    rotulo(ctx, w / 2, cy - r - 10, "ação  ", "A", "t", css("--agente"));
+    rotulo(ctx, w / 2, cy + r + 20, "estado  ", "S", "t+1", css("--ambiente"));
+    rotulo(ctx, w / 2, cy + r + 38, "recompensa  ", "R", "t+1", css("--recompensa"));
+
+    var p = pontoLaco(fase, ax, bx, cy, r);
+    ctx.save();
+    ctx.fillStyle = fase < 0.5 ? css("--agente") : css("--recompensa");
+    ctx.beginPath(); ctx.arc(p[0], p[1], 5.5, 0, TAU); ctx.fill();
+    ctx.globalAlpha = .22;
+    ctx.beginPath(); ctx.arc(p[0], p[1], 11, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    caixa(ctx, ax, cy, bw, bh, css("--agente"), "agente");
+    caixa(ctx, bx, cy, bw, bh, css("--ambiente"), "ambiente");
+  }
+
+  function heroTick() {
+    fase = (fase + 0.0035) % 1;
+    drawHero();
+    requestAnimationFrame(heroTick);
+  }
+
+  /* ---------------- § 03 · corredor ---------------- */
+  var COR_N = 7, COR_INI = 3, COR_FIM = 6;
+  var cor = { s: COR_INI, t: 0, acc: 0, ep: 0, pol: "rand", ultimoR: null, auto: false, timer: 0 };
+  var corTraj = $("corTraj");
+
+  function corReset(tudo) {
+    cor.s = COR_INI; cor.t = 0; cor.acc = 0; cor.ultimoR = null;
+    if (tudo) { cor.ep = 0; corTraj.innerHTML = ""; }
+    corLog('<span class="t0">— episódio ' + (cor.ep + 1) + ' —</span> <span class="s">S₀=' + COR_INI + '</span>');
+    corUpd();
+  }
+
+  function corLog(html) {
+    var d = document.createElement("div");
+    d.innerHTML = html;
+    corTraj.appendChild(d);
+    corTraj.scrollTop = corTraj.scrollHeight;
+    while (corTraj.childNodes.length > 40) corTraj.removeChild(corTraj.firstChild);
+  }
+
+  function corPasso() {
+    var acao = (cor.pol === "dir") ? 1 : (Math.random() < 0.5 ? -1 : 1);
+    var novo = Math.max(0, Math.min(COR_N - 1, cor.s + acao));
+    var r = -1;
+    if (novo === COR_FIM) r = 10;
+    cor.s = novo; cor.t += 1; cor.acc += r; cor.ultimoR = r;
+    corLog(
+      '<span class="a">A' + (cor.t - 1) + '=' + (acao > 0 ? "→" : "←") + "</span> " +
+      '<span class="r">R' + cor.t + "=" + (r > 0 ? "+" : "") + r + "</span> " +
+      '<span class="s">S' + cor.t + "=" + novo + "</span>"
+    );
+    if (novo === COR_FIM) {
+      cor.ep += 1;
+      corLog('<span class="t0">fim do episódio: G = ' + cor.acc + " em " + cor.t + " passos</span>");
+      corUpd(); drawCor();
+      setTimeout(function () { corReset(false); drawCor(); }, 550);
+      return;
+    }
+    corUpd(); drawCor();
+  }
+
+  function corUpd() {
+    $("corT").textContent = cor.t;
+    $("corS").textContent = cor.s;
+    $("corR").textContent = cor.ultimoR === null ? "—" : (cor.ultimoR > 0 ? "+" : "") + cor.ultimoR;
+    $("corAcc").textContent = cor.acc;
+    $("corEp").textContent = cor.ep;
+  }
+
+  function drawCor() {
+    var f = fit($("corCanvas"));
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, h = f.h;
+    var pad = 10, gap = 6;
+    var cw = (w - 2 * pad - gap * (COR_N - 1)) / COR_N;
+    var ch = Math.min(cw, h - 46);
+    var y = (h - ch) / 2 - 4;
+    for (var i = 0; i < COR_N; i++) {
+      var x = pad + i * (cw + gap);
+      ctx.save();
+      ctx.fillStyle = i === COR_FIM ? css("--recompensa-bg") : css("--surface-2");
+      ctx.strokeStyle = i === COR_FIM ? css("--recompensa") : css("--rule");
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.rect(x, y, cw, ch); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = css("--ink-mute");
+      ctx.font = "10px " + fam("--mono");
+      ctx.textAlign = "center"; ctx.textBaseline = "top";
+      ctx.fillText(String(i), x + cw / 2, y + ch + 6);
+      if (i === COR_FIM) {
+        ctx.fillStyle = css("--recompensa");
+        ctx.font = "600 12px " + fam("--sans");
+        ctx.textBaseline = "middle";
+        ctx.fillText("+10", x + cw / 2, y + ch / 2);
+      }
+      ctx.restore();
+    }
+    var ax = pad + cor.s * (cw + gap) + cw / 2;
+    ctx.save();
+    ctx.fillStyle = css("--agente");
+    ctx.beginPath(); ctx.arc(ax, y + ch / 2, Math.min(13, ch * 0.3), 0, TAU); ctx.fill();
+    ctx.globalAlpha = .2;
+    ctx.beginPath(); ctx.arc(ax, y + ch / 2, Math.min(21, ch * 0.46), 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = css("--ink-mute");
+    ctx.font = "10px " + fam("--sans");
+    ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillText("cada passo custa −1", pad, h - 2);
+    ctx.restore();
+  }
+
+  $("corPasso").addEventListener("click", function () { corPasso(); });
+  $("corReset").addEventListener("click", function () { corReset(true); drawCor(); });
+  $("corAuto").addEventListener("click", function () {
+    cor.auto = !cor.auto;
+    this.textContent = cor.auto ? "Parar" : "Automático";
+    if (cor.auto) {
+      cor.timer = setInterval(function () { if (cor.auto) corPasso(); }, 320);
+    } else { clearInterval(cor.timer); }
+  });
+  wireSeg("corPol", function (k) { cor.pol = k; });
+
+  /* ---------------- § 05 · desconto ---------------- */
+  var gam = { g: 0.9, n: 3, big: 10 };
+
+  function drawGam() {
+    var f = fit($("gamCanvas"));
+    if (!f) return;
+    var ctx = f.ctx, w = f.w, h = f.h;
+    var total = gam.n + 2;                    /* terminal esq + início + n células */
+    var pad = 10, gap = 6;
+    var cw = (w - 2 * pad - gap * (total - 1)) / total;
+    var ch = Math.min(cw, h - 44);
+    var y = (h - ch) / 2 - 2;
+    for (var i = 0; i < total; i++) {
+      var x = pad + i * (cw + gap);
+      var terminal = (i === 0) || (i === total - 1);
+      ctx.save();
+      ctx.fillStyle = terminal ? css("--recompensa-bg") : css("--surface-2");
+      ctx.strokeStyle = terminal ? css("--recompensa") : css("--rule");
+      ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.rect(x, y, cw, ch); ctx.fill(); ctx.stroke();
+      if (terminal) {
+        ctx.fillStyle = css("--recompensa");
+        ctx.font = "600 " + Math.min(15, cw * 0.32) + "px " + fam("--sans");
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("+" + (i === 0 ? 1 : gam.big), x + cw / 2, y + ch / 2);
+      } else if (i > 1) {
+        ctx.fillStyle = css("--ink-mute");
+        ctx.font = "12px " + fam("--mono");
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("0", x + cw / 2, y + ch / 2);
+      }
+      ctx.restore();
+    }
+    var ax = pad + 1 * (cw + gap) + cw / 2;
+    ctx.save();
+    ctx.fillStyle = css("--agente");
+    ctx.beginPath(); ctx.arc(ax, y + ch / 2, Math.min(13, ch * 0.3), 0, TAU); ctx.fill();
+    ctx.globalAlpha = .2;
+    ctx.beginPath(); ctx.arc(ax, y + ch / 2, Math.min(21, ch * 0.46), 0, TAU); ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = css("--ink-mute");
+    ctx.font = "10px " + fam("--sans");
+    ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+    ctx.fillText("terminal", pad, y - 4);
+    ctx.textAlign = "right";
+    ctx.fillText("terminal", w - pad, y - 4);
+    ctx.restore();
+  }
+
+  function updGam() {
+    var GL = 1;
+    var GR = Math.pow(gam.g, gam.n - 1) * gam.big;
+    var mx = Math.max(GL, GR, 0.001);
+    $("gamBarL").style.width = (100 * GL / mx) + "%";
+    $("gamBarR").style.width = (100 * GR / mx) + "%";
+    $("gamNumL").textContent = num(GL);
+    $("gamNumR").textContent = num(GR);
+    $("gamRowL").classList.toggle("win", GL >= GR);
+    $("gamRowR").classList.toggle("win", GR > GL);
+    $("gamEq").innerHTML =
+      '<span class="v">G</span>(←) = 1' +
+      '&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;' +
+      '<span class="v">G</span>(→) = γ<sup>' + (gam.n - 1) + '</sup> · ' + gam.big +
+      ' = <span class="op-rec">' + num(GR) + "</span>";
+    var msg = $("gamMsg");
+    var crit = gam.n === 1 ? 0 : Math.pow(1 / gam.big, 1 / (gam.n - 1));
+    if (GR > GL) {
+      msg.className = "verdict ok";
+      msg.textContent = "Com γ = " + num(gam.g) + ", o valor manda ir para a DIREITA — " +
+        "mesmo custando " + (gam.n) + " passos e nenhuma recompensa no caminho. " +
+        "O empate ocorre em γ = " + num(crit, 3) + ".";
+    } else {
+      msg.className = "verdict bad";
+      msg.textContent = "Com γ = " + num(gam.g) + ", o agente é míope demais: prefere o +1 imediato à ESQUERDA " +
+        "e nunca chega ao prêmio maior. Precisaria de γ > " + num(crit, 3) + ".";
+    }
+  }
+
+  wireSld("gamSld", "gamOut", function (v) { return num(v); }, function (v) { gam.g = v; updGam(); });
+  wireSld("gamN", "gamNOut", function (v) { return String(v); }, function (v) { gam.n = v; updGam(); drawGam(); });
+  wireSld("gamBig", "gamBigOut", function (v) { return String(v); }, function (v) { gam.big = v; updGam(); drawGam(); });
+
+  /* ---------------- § 06 · testbed de 10 braços ---------------- */
+  var ban = { modo: "rec", eps: 0.30, dados: null };
+
+  /* PRNG com semente: as quatro curvas veem exatamente os mesmos
+     problemas, então a diferença entre elas é só a política. */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(rng) {
+    var u = 1 - rng(), v = rng();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+  }
+
+  function rodarBandit() {
+    var K = 10, RUNS = 200, STEPS = 1000;
+    var eps = [0, 0.01, 0.1, ban.eps];
+    var rec = [], opt = [], e, t, i;
+    for (e = 0; e < eps.length; e++) { rec.push(new Float64Array(STEPS)); opt.push(new Float64Array(STEPS)); }
+
+    for (e = 0; e < eps.length; e++) {
+      var rng = mulberry32(20250817);
+      for (var run = 0; run < RUNS; run++) {
+        var q = new Float64Array(K), Q = new Float64Array(K), N = new Float64Array(K);
+        var best = 0;
+        for (i = 0; i < K; i++) { q[i] = gauss(rng); if (q[i] > q[best]) best = i; }
+        for (t = 0; t < STEPS; t++) {
+          var a;
+          if (rng() < eps[e]) {
+            a = (rng() * K) | 0;
+          } else {                                   /* guloso com empate sorteado */
+            a = 0; var bv = Q[0], cnt = 1;
+            for (i = 1; i < K; i++) {
+              if (Q[i] > bv) { bv = Q[i]; a = i; cnt = 1; }
+              else if (Q[i] === bv) { cnt++; if (rng() < 1 / cnt) a = i; }
+            }
+          }
+          var r = q[a] + gauss(rng);
+          N[a] += 1;
+          Q[a] += (r - Q[a]) / N[a];                 /* média amostral incremental */
+          rec[e][t] += r;
+          if (a === best) opt[e][t] += 1;
+        }
+      }
+      for (t = 0; t < STEPS; t++) { rec[e][t] /= RUNS; opt[e][t] = 100 * opt[e][t] / RUNS; }
+    }
+    ban.dados = { eps: eps, rec: rec, opt: opt };
+
+    var ids = ["banV0", "banV1", "banV2", "banV3"];
+    for (e = 0; e < 4; e++) {
+      var serie = ban.modo === "rec" ? rec[e] : opt[e], s = 0;
+      for (t = STEPS - 100; t < STEPS; t++) s += serie[t];
+      s /= 100;
+      $(ids[e]).textContent = ban.modo === "rec" ? num(s) : num(s, 0) + "%";
+    }
+    $("banMsg").textContent = ban.modo === "rec"
+      ? "Leitura: recompensa média nos últimos 100 passos. O ótimo alcançável ronda 1,55 (o melhor braço médio de 10 sorteios normais padrão)."
+      : "Leitura: fração de passos em que a ação escolhida era a melhor. Nenhuma curva chega a 100% — o ε-guloso explora para sempre.";
+  }
+
+  /* média móvel: 200 execuções deixam a curva serrilhada demais para projetar.
+     A suavização é só de exibição — os números da leitura vêm dos dados crus. */
+  function suavizar(a, w) {
+    var n = a.length, out = new Float64Array(n), soma = 0, i;
+    for (i = 0; i < n; i++) {
+      soma += a[i];
+      if (i >= w) soma -= a[i - w];
+      out[i] = soma / Math.min(i + 1, w);
+    }
+    return out;
+  }
+
+  function drawBan() {
+    var f = fit($("banCanvas"));
+    if (!f) return;
+    var ctx = f.ctx;
+    var rec = ban.modo === "rec";
+    var ymax = rec ? 1.6 : 100;
+    var g = eixos(ctx, f, 0, 1000, 0, ymax, "passos", rec ? "recompensa média" : "% ação ótima");
+    if (!ban.dados) {
+      ctx.save();
+      ctx.fillStyle = css("--ink-mute"); ctx.font = "12px " + fam("--sans");
+      ctx.textAlign = "center";
+      ctx.fillText("clique em “Rodar”", g.L + g.w / 2, g.T + g.h / 2);
+      ctx.restore();
+      return;
+    }
+    var cores = [css("--ink-mute"), css("--ambiente"), css("--recompensa"), css("--agente")];
+    var series = rec ? ban.dados.rec : ban.dados.opt;
+    for (var e = 0; e < series.length; e++) {
+      var curva = suavizar(series[e], 25);
+      ctx.save();
+      ctx.strokeStyle = cores[e]; ctx.lineWidth = e === 3 ? 1.4 : 1.8;
+      if (e === 3) ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      for (var t = 0; t < 1000; t += 2) {
+        var X = g.x(t), Y = g.y(Math.min(curva[t], ymax));
+        if (t === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+      }
+      ctx.stroke(); ctx.restore();
+    }
+    /* legenda, sobre um retângulo opaco para não sumir nas curvas */
+    ctx.save();
+    ctx.font = "10px " + fam("--mono"); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    var labels2 = ["ε = 0", "ε = 0,01", "ε = 0,1", "ε = " + num(ban.eps)];
+    var lx = g.L + g.w - 88, ly = g.T + g.h - 66;
+    ctx.fillStyle = css("--surface");
+    ctx.globalAlpha = .92;
+    ctx.fillRect(lx - 6, ly - 11, 92, 60);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = css("--rule-soft"); ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 6, ly - 11, 92, 60);
+    for (var k = 0; k < 4; k++) {
+      var yy = ly + k * 14;
+      ctx.strokeStyle = cores[k]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lx, yy); ctx.lineTo(lx + 16, yy); ctx.stroke();
+      ctx.fillStyle = cores[k];
+      ctx.fillText(labels2[k], lx + 21, yy);
+    }
+    ctx.restore();
+  }
+
+  $("banRun").addEventListener("click", function () {
+    this.disabled = true;
+    var b = this;
+    setTimeout(function () { rodarBandit(); drawBan(); b.disabled = false; }, 10);
+  });
+  wireSeg("banSeg", function (k) {
+    ban.modo = k;
+    if (ban.dados) rodarBandit();
+    drawBan();
+  });
+  wireSld("banEps", "banEpsOut", function (v) { return num(v); }, function (v) {
+    ban.eps = v;
+    if (ban.dados) { rodarBandit(); drawBan(); }
+  });
+
+  /* ---------------- § 08 · jogo da velha ---------------- */
+  var LINHAS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  var POW3 = [1, 3, 9, 27, 81, 243, 729, 2187, 6561];
+
+  var tt = {
+    V: null, visto: null, ep: 0, hist: [],
+    ring: new Int8Array(500), ri: 0, rn: 0, wins: 0, losses: 0, nvis: 0,
+    rodando: false, alpha: 0.1, eps: 0.1, opp: 0.5, updExp: false
+  };
+
+  function ttZerar() {
+    tt.V = new Float64Array(19683); tt.V.fill(0.5);
+    tt.visto = new Uint8Array(19683);
+    tt.ep = 0; tt.hist = []; tt.ri = 0; tt.rn = 0; tt.wins = 0; tt.losses = 0; tt.nvis = 0;
+    $("ttEp").textContent = "0";
+    $("ttWin").textContent = "—";
+    $("ttLoss").textContent = "—";
+    $("ttStates").textContent = "0";
+  }
+
+  function vencedor(b) {
+    for (var i = 0; i < 8; i++) {
+      var L = LINHAS[i], v = b[L[0]];
+      if (v !== 0 && v === b[L[1]] && v === b[L[2]]) return v;
+    }
+    return 0;
+  }
+  function cheio(b) {
+    for (var i = 0; i < 9; i++) if (b[i] === 0) return false;
+    return true;
+  }
+  /* Valor terminal do ponto de vista do agente (X): 1 vitória, 0,5 empate,
+     0 derrota. Devolve null se a partida continua.
+     Sutton usa 0 também para o empate — ver a nota da aula sobre essa escolha. */
+  function valorTerminal(b) {
+    var v = vencedor(b);
+    if (v === 1) return 1;
+    if (v === 2) return 0;
+    if (cheio(b)) return 0.5;
+    return null;
+  }
+  function codigo(b) {
+    var c = 0;
+    for (var i = 0; i < 9; i++) c += b[i] * POW3[i];
+    return c;
+  }
+
+  /* Oponente ótimo por minimax, memorizado. Devolve o resultado da partida
+     com jogo perfeito dos dois lados: +1 X vence, 0 empate, −1 O vence.
+     De quem é a vez sai da contagem de peças, então o código do tabuleiro
+     basta como chave. */
+  var MM = new Int8Array(19683).fill(9);             /* 9 = ainda não calculado */
+
+  function minimax(b) {
+    var v = vencedor(b);
+    if (v === 1) return 1;
+    if (v === 2) return -1;
+    if (cheio(b)) return 0;
+    var cod = codigo(b);
+    if (MM[cod] !== 9) return MM[cod];
+    var nx = 0, no = 0, i;
+    for (i = 0; i < 9; i++) { if (b[i] === 1) nx++; else if (b[i] === 2) no++; }
+    var vez = (nx === no) ? 1 : 2;
+    var melhor = vez === 1 ? -2 : 2;
+    for (i = 0; i < 9; i++) {
+      if (b[i] !== 0) continue;
+      b[i] = vez;
+      var r = minimax(b);
+      b[i] = 0;
+      if (vez === 1) { if (r > melhor) melhor = r; }
+      else { if (r < melhor) melhor = r; }
+    }
+    MM[cod] = melhor;
+    return melhor;
+  }
+
+  function jogadaO(b) {
+    var livres = [], i, m;
+    for (i = 0; i < 9; i++) if (b[i] === 0) livres.push(i);
+    if (Math.random() < tt.opp) {                    /* joga de forma ótima */
+      var melhor = -1, mv = 2, cnt = 1;
+      for (i = 0; i < livres.length; i++) {
+        m = livres[i]; b[m] = 2;
+        var r = minimax(b);
+        b[m] = 0;
+        if (r < mv) { mv = r; melhor = m; cnt = 1; }
+        else if (r === mv) { cnt++; if (Math.random() < 1 / cnt) melhor = m; }
+      }
+      return melhor;
+    }
+    return livres[(Math.random() * livres.length) | 0];
+  }
+
+  function episodio() {
+    var b = new Int8Array(9);
+    var prev = -1, i, m;
+
+    for (;;) {
+      /* --- jogada do agente (X): escolhe entre os estados resultantes --- */
+      var livres = [];
+      for (i = 0; i < 9; i++) if (b[i] === 0) livres.push(i);
+      var explorou = Math.random() < tt.eps;
+      var esc;
+      if (explorou) {
+        esc = livres[(Math.random() * livres.length) | 0];
+      } else {
+        var melhor = -1, mv = -1, cnt = 1;
+        for (i = 0; i < livres.length; i++) {
+          m = livres[i]; b[m] = 1;
+          var tv = valorTerminal(b);
+          var val = tv === null ? tt.V[codigo(b)] : tv;
+          b[m] = 0;
+          if (val > mv) { mv = val; melhor = m; cnt = 1; }
+          else if (val === mv) { cnt++; if (Math.random() < 1 / cnt) melhor = m; }
+        }
+        esc = melhor;
+      }
+      b[esc] = 1;
+      var cod = codigo(b);
+      if (!tt.visto[cod]) { tt.visto[cod] = 1; tt.nvis++; }
+
+      var term = valorTerminal(b);
+      if (term !== null) {                            /* X venceu ou empatou */
+        if (prev >= 0) tt.V[prev] += tt.alpha * (term - tt.V[prev]);
+        return term === 1 ? 1 : 0;
+      }
+      /* atualização temporal: puxa a estimativa anterior para a atual.
+         Só aprendemos com jogadas gulosas, salvo se o professor pedir o contrário. */
+      if (prev >= 0 && (!explorou || tt.updExp)) {
+        tt.V[prev] += tt.alpha * (tt.V[cod] - tt.V[prev]);
+      }
+      prev = cod;
+
+      /* --- jogada do oponente (O) --- */
+      b[jogadaO(b)] = 2;
+      var term2 = valorTerminal(b);
+      if (term2 !== null) {                           /* derrota ou empate */
+        tt.V[prev] += tt.alpha * (term2 - tt.V[prev]);
+        return vencedor(b) === 2 ? -1 : 0;
+      }
+    }
+  }
+
+  function ttPush(r) {
+    if (tt.rn === 500) {
+      var old = tt.ring[tt.ri];
+      if (old === 1) tt.wins--; else if (old === -1) tt.losses--;
+    } else { tt.rn++; }
+    tt.ring[tt.ri] = r;
+    if (r === 1) tt.wins++; else if (r === -1) tt.losses++;
+    tt.ri = (tt.ri + 1) % 500;
+  }
+
+  function ttLote(n) {
+    for (var i = 0; i < n; i++) {
+      ttPush(episodio());
+      tt.ep++;
+      if (tt.ep % 100 === 0 && tt.rn > 0) {
+        tt.hist.push([tt.ep, 100 * tt.wins / tt.rn, 100 * tt.losses / tt.rn]);
+      }
+    }
+    $("ttEp").textContent = tt.ep;
+    $("ttWin").textContent = tt.rn ? num(100 * tt.wins / tt.rn, 0) + "%" : "—";
+    $("ttLoss").textContent = tt.rn ? num(100 * tt.losses / tt.rn, 0) + "%" : "—";
+    $("ttStates").textContent = tt.nvis;
+    drawTT(); ttBoard();
+  }
+
+  function drawTT() {
+    var f = fit($("ttCanvas"));
+    if (!f) return;
+    var ctx = f.ctx;
+    var xmax = Math.max(2000, Math.ceil(tt.ep / 2000) * 2000);
+    var g = eixos(ctx, f, 0, xmax, 0, 100, "partidas", "% das últimas 500");
+    if (tt.hist.length < 2) {
+      ctx.save();
+      ctx.fillStyle = css("--ink-mute"); ctx.font = "12px " + fam("--sans");
+      ctx.textAlign = "center";
+      ctx.fillText("clique em “Treinar”", g.L + g.w / 2, g.T + g.h / 2);
+      ctx.restore();
+      return;
+    }
+    var pares = [[1, css("--recompensa"), "vitórias"], [2, css("--alerta"), "derrotas"]];
+    pares.forEach(function (par) {
+      ctx.save();
+      ctx.strokeStyle = par[1]; ctx.lineWidth = 1.7;
+      ctx.beginPath();
+      for (var i = 0; i < tt.hist.length; i++) {
+        var X = g.x(tt.hist[i][0]), Y = g.y(tt.hist[i][par[0]]);
+        if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+      }
+      ctx.stroke(); ctx.restore();
+    });
+    /* legenda na faixa central, que fica livre nas duas curvas */
+    ctx.save();
+    ctx.font = "10px " + fam("--mono"); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    var lx = g.L + 12, ly = g.T + g.h * 0.46;
+    ctx.fillStyle = css("--surface"); ctx.globalAlpha = .92;
+    ctx.fillRect(lx - 6, ly - 11, 86, 32);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = css("--rule-soft"); ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 6, ly - 11, 86, 32);
+    pares.forEach(function (par, k) {
+      var yy = ly + k * 14;
+      ctx.strokeStyle = par[1]; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lx, yy); ctx.lineTo(lx + 16, yy); ctx.stroke();
+      ctx.fillStyle = par[1]; ctx.fillText(par[2], lx + 21, yy);
+    });
+    ctx.restore();
+  }
+
+  var boardEl = $("ttBoard");
+  (function initBoard() {
+    for (var i = 0; i < 9; i++) {
+      var d = document.createElement("div");
+      d.innerHTML = "<span>—</span>";
+      boardEl.appendChild(d);
+    }
+  })();
+
+  function ttBoard() {
+    var vals = [], i;
+    for (i = 0; i < 9; i++) vals.push(tt.V[POW3[i]]);
+    var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+    for (i = 0; i < 9; i++) {
+      var cel = boardEl.children[i];
+      cel.querySelector("span").textContent = num(vals[i], 2);
+      var frac = mx - mn < 1e-9 ? 0 : (vals[i] - mn) / (mx - mn);
+      cel.style.setProperty("--fill", (0.06 + 0.5 * frac).toFixed(3));
+    }
+  }
+
+  function ttFrame() {
+    if (!tt.rodando) return;
+    ttLote(300);
+    if (tt.ep >= 60000) { tt.rodando = false; $("ttRun").textContent = "Treinar"; return; }
+    requestAnimationFrame(ttFrame);
+  }
+
+  $("ttRun").addEventListener("click", function () {
+    tt.rodando = !tt.rodando;
+    this.textContent = tt.rodando ? "Pausar" : "Treinar";
+    if (tt.rodando) requestAnimationFrame(ttFrame);
+  });
+  $("ttReset").addEventListener("click", function () {
+    tt.rodando = false; $("ttRun").textContent = "Treinar";
+    ttZerar(); drawTT(); ttBoard();
+  });
+  $("ttExpUpd").addEventListener("change", function () { tt.updExp = this.checked; });
+  wireSld("ttAlpha", "ttAlphaOut", function (v) { return num(v); }, function (v) { tt.alpha = v; });
+  wireSld("ttEps", "ttEpsOut", function (v) { return num(v); }, function (v) { tt.eps = v; });
+  wireSld("ttOpp", "ttOppOut", function (v) { return num(100 * v, 0) + "%"; }, function (v) { tt.opp = v; });
+
+  /* ---------------- exercícios ---------------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-reveal]"), function (btn) {
+    btn.addEventListener("click", function () {
+      var sol = btn.parentNode.querySelector(".sol");
+      if (sol.hasAttribute("hidden")) { sol.removeAttribute("hidden"); btn.textContent = "Ocultar"; }
+      else { sol.setAttribute("hidden", ""); btn.textContent = "Mostrar resolução"; }
+    });
+  });
+
+  /* ---------------- navegação (documento) ---------------- */
+  var links = Array.prototype.slice.call(document.querySelectorAll("#toc a"));
+  var secs = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      if (isPresent()) return;
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var i = secs.indexOf(e.target);
+        links.forEach(function (a, j) { a.classList.toggle("on", j === i); });
+      });
+    }, { rootMargin: "-15% 0px -75% 0px" });
+    secs.forEach(function (s) { if (s) io.observe(s); });
+  }
+
+  /* ============================================================
+     MODO APRESENTAÇÃO
+     ============================================================ */
+  var slides = Array.prototype.slice.call(document.querySelectorAll(".slide"));
+  var cur = 0;
+  var hudWhere = $("hudWhere"), hudCount = $("hudCount");
+  var hudBar = $("hudBar"), hudZoom = $("hudZoom");
+
+  function isPresent() { return root.getAttribute("data-mode") === "present"; }
+
+  var ps = 1;
+  try {
+    var saved = parseFloat(localStorage.getItem("ppgi071-ps"));
+    if (isFinite(saved) && saved >= .6 && saved <= 2.2) ps = saved;
+  } catch (e) {}
+
+  function applyPs() {
+    root.style.setProperty("--ps", String(ps));
+    hudZoom.textContent = Math.round(ps * 100) + "%";
+    try { localStorage.setItem("ppgi071-ps", String(ps)); } catch (e) {}
+    redrawAll();
+  }
+  function bumpPs(d) { ps = Math.min(2.2, Math.max(.6, Math.round((ps + d) * 100) / 100)); applyPs(); }
+
+  $("hudZoomIn").addEventListener("click", function () { bumpPs(.1); });
+  $("hudZoomOut").addEventListener("click", function () { bumpPs(-.1); });
+
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach(function (s, j) { s.classList.toggle("on", j === cur); });
+    hudWhere.innerHTML = "<b>" + (slides[cur].getAttribute("data-sec") || "") + "</b>";
+    hudCount.textContent = (cur + 1) + " / " + slides.length;
+    hudBar.style.width = (((cur + 1) / slides.length) * 100) + "%";
+    slides[cur].scrollTop = 0;
+    redrawAll();
+  }
+
+  function enterPresent() {
+    var best = 0, bestD = Infinity, mid = window.scrollY + window.innerHeight / 3;
+    slides.forEach(function (s, j) {
+      var el = s.firstElementChild;
+      if (!el) return;
+      var d = Math.abs(el.getBoundingClientRect().top + window.scrollY - mid);
+      if (d < bestD) { bestD = d; best = j; }
+    });
+    root.setAttribute("data-mode", "present");
+    if (root.requestFullscreen) root.requestFullscreen().catch(function () {});
+    applyPs();
+    show(best);
+  }
+
+  function exitPresent() {
+    root.removeAttribute("data-mode");
+    slides.forEach(function (s) { s.classList.remove("on"); });
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
+    var el = slides[cur] && slides[cur].firstElementChild;
+    if (el) el.scrollIntoView({ block: "center" });
+    redrawAll();
+  }
+
+  $("presentBtn").addEventListener("click", enterPresent);
+  $("hudExit").addEventListener("click", exitPresent);
+  $("hudNext").addEventListener("click", function () { show(cur + 1); });
+  $("hudPrev").addEventListener("click", function () { show(cur - 1); });
+
+  document.addEventListener("fullscreenchange", function () {
+    if (!document.fullscreenElement && isPresent()) exitPresent();
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.target.tagName === "INPUT") return;
+    if (!isPresent()) {
+      if (ev.key === "p" || ev.key === "P") { ev.preventDefault(); enterPresent(); }
+      return;
+    }
+    switch (ev.key) {
+      case "ArrowRight": case "PageDown": case " ": case "Enter":
+        ev.preventDefault(); show(cur + 1); break;
+      case "ArrowLeft": case "PageUp":
+        ev.preventDefault(); show(cur - 1); break;
+      case "Home": ev.preventDefault(); show(0); break;
+      case "End": ev.preventDefault(); show(slides.length - 1); break;
+      case "+": case "=": ev.preventDefault(); bumpPs(.1); break;
+      case "-": case "_": ev.preventDefault(); bumpPs(-.1); break;
+      case "0": ev.preventDefault(); ps = 1; applyPs(); break;
+      case "Escape": exitPresent(); break;
+    }
+  });
+
+  /* ---------------- redraw ---------------- */
+  function redrawAll() { drawHero(); drawCor(); drawGam(); drawBan(); drawTT(); }
+  window.addEventListener("resize", redrawAll);
+
+  hudZoom.textContent = Math.round(ps * 100) + "%";
+  ttZerar(); ttBoard();
+  corReset(true);
+  updGam();
+  redrawAll();
+  if (!reduce) heroTick();
+})();
+</script>
